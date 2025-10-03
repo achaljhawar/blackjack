@@ -15,6 +15,55 @@
       "when": 1759207181152,
       "tag": "0001_yummy_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759230160250,
+      "tag": "0002_yellow_toxin",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1759230391874,
+      "tag": "0003_spicy_dakota_north",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1759481907154,
+      "tag": "0004_cuddly_jazinda",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1759486299845,
+      "tag": "0005_premium_infant_terrible",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1759492096747,
+      "tag": "0006_complete_gorgon",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1759495520822,
+      "tag": "0007_lying_silk_fever",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1759502074233,
+      "tag": "0008_gigantic_sebastian_shaw",
+      "breakpoints": true
     }
   ]
 }

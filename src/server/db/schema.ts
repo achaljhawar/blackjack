@@ -1,87 +1,185 @@
-import { relations, sql } from "drizzle-orm";
-import { index, pgTableCreator, primaryKey } from "drizzle-orm/pg-core";
-import { type AdapterAccount } from "next-auth/adapters";
+import { relations } from "drizzle-orm";
+import {
+  text,
+  varchar,
+  integer,
+  timestamp,
+  jsonb,
+  pgTableCreator,
+  primaryKey,
+  index,
+} from "drizzle-orm/pg-core";
 
-/**
- * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
- * database instance for multiple projects.
- *
- * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
- */
 export const createTable = pgTableCreator((name) => `blackjack_${name}`);
 
-export const users = createTable("user", (d) => ({
-  id: d
-    .varchar({ length: 255 })
+export const users = createTable("user", {
+  id: varchar("id", { length: 255 })
     .notNull()
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  name: d.varchar({ length: 255 }),
-  email: d.varchar({ length: 255 }).notNull(),
-  emailVerified: d
-    .timestamp({
-      mode: "date",
-      withTimezone: true,
-    })
-    .default(sql`CURRENT_TIMESTAMP`),
-  image: d.varchar({ length: 255 }),
-}));
+  name: varchar("name", { length: 255 }),
+  email: varchar("email", { length: 255 }).notNull(),
+  emailVerified: timestamp("emailVerified", {
+    withTimezone: true,
+  }).defaultNow(),
+  image: varchar("image", { length: 255 }),
+  currentBalance: integer("currentBalance").notNull().default(250),
+  totalWagered: integer("totalWagered").notNull().default(0),
+  totalWins: integer("totalWins").notNull().default(0),
+  totalLosses: integer("totalLosses").notNull().default(0),
+  totalPushes: integer("totalPushes").notNull().default(0),
+  totalChipsBought: integer("totalChipsBought").notNull().default(0),
+});
 
 export const usersRelations = relations(users, ({ many }) => ({
-  accounts: many(accounts),
+  accounts: many(accounts, { relationName: "user" }),
+  sessions: many(sessions, { relationName: "user" }),
+  transactions: many(transactions, { relationName: "user" }),
+  games: many(games, { relationName: "user" }),
 }));
 
 export const accounts = createTable(
   "account",
-  (d) => ({
-    userId: d
-      .varchar({ length: 255 })
+  {
+    userId: varchar("userId", { length: 255 })
       .notNull()
       .references(() => users.id),
-    type: d.varchar({ length: 255 }).$type<AdapterAccount["type"]>().notNull(),
-    provider: d.varchar({ length: 255 }).notNull(),
-    providerAccountId: d.varchar({ length: 255 }).notNull(),
-    refresh_token: d.text(),
-    access_token: d.text(),
-    expires_at: d.integer(),
-    token_type: d.varchar({ length: 255 }),
-    scope: d.varchar({ length: 255 }),
-    id_token: d.text(),
-    session_state: d.varchar({ length: 255 }),
+    type: varchar("type", { length: 255 }).notNull(),
+    provider: varchar("provider", { length: 255 }).notNull(),
+    providerAccountId: varchar("providerAccountId", { length: 255 }).notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: varchar("token_type", { length: 255 }),
+    scope: varchar("scope", { length: 255 }),
+    id_token: text("id_token"),
+    session_state: varchar("session_state", { length: 255 }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.provider, table.providerAccountId] }),
+    userIdx: index("account_user_id_idx").on(table.userId),
   }),
-  (t) => [
-    primaryKey({ columns: [t.provider, t.providerAccountId] }),
-    index("account_user_id_idx").on(t.userId),
-  ],
 );
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
-  user: one(users, { fields: [accounts.userId], references: [users.id] }),
+  user: one(users, {
+    fields: [accounts.userId],
+    references: [users.id],
+    relationName: "user",
+  }),
 }));
 
 export const sessions = createTable(
   "session",
-  (d) => ({
-    sessionToken: d.varchar({ length: 255 }).notNull().primaryKey(),
-    userId: d
-      .varchar({ length: 255 })
+  {
+    sessionToken: varchar("sessionToken", { length: 255 })
+      .notNull()
+      .primaryKey(),
+    userId: varchar("userId", { length: 255 })
       .notNull()
       .references(() => users.id),
-    expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
+    expires: timestamp("expires", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    userIdx: index("t_user_id_idx").on(table.userId),
   }),
-  (t) => [index("t_user_id_idx").on(t.userId)],
 );
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
-  user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
+    relationName: "user",
+  }),
 }));
 
 export const verificationTokens = createTable(
   "verification_token",
-  (d) => ({
-    identifier: d.varchar({ length: 255 }).notNull(),
-    token: d.varchar({ length: 255 }).notNull(),
-    expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
+  {
+    identifier: varchar("identifier", { length: 255 }).notNull(),
+    token: varchar("token", { length: 255 }).notNull(),
+    expires: timestamp("expires", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.identifier, table.token] }),
   }),
-  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
 );
+
+export const transactions = createTable(
+  "transaction",
+  {
+    id: varchar("id", { length: 255 })
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: varchar("userId", { length: 255 })
+      .notNull()
+      .references(() => users.id),
+    type: varchar("type", { length: 50 }).notNull(),
+    amount: integer("amount").notNull(),
+    balanceBefore: integer("balanceBefore").notNull(),
+    balanceAfter: integer("balanceAfter").notNull(),
+    gameId: varchar("gameId", { length: 255 }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdx: index("transaction_user_id_idx").on(table.userId),
+    createdIdx: index("transaction_created_at_idx").on(table.createdAt),
+    gameIdx: index("transaction_game_id_idx").on(table.gameId),
+  }),
+);
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(users, {
+    fields: [transactions.userId],
+    references: [users.id],
+    relationName: "user",
+  }),
+}));
+
+export const games = createTable(
+  "game",
+  {
+    id: varchar("id", { length: 255 })
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: varchar("userId", { length: 255 })
+      .notNull()
+      .references(() => users.id),
+    betAmount: integer("betAmount").notNull(),
+    playerHand: jsonb("playerHand").notNull(),
+    dealerHand: jsonb("dealerHand").notNull(),
+    deck: jsonb("deck").notNull(),
+    status: varchar("status", { length: 50 }).notNull(),
+    result: varchar("result", { length: 50 }),
+    playerScore: integer("playerScore"),
+    dealerScore: integer("dealerScore"),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completedAt", { withTimezone: true }),
+    lastActivityAt: timestamp("lastActivityAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastAction: varchar("lastAction", { length: 50 }),
+  },
+  (table) => ({
+    userIdx: index("game_user_id_idx").on(table.userId),
+    statusIdx: index("game_status_idx").on(table.status),
+    createdIdx: index("game_created_at_idx").on(table.createdAt),
+    lastActivityIdx: index("game_last_activity_idx").on(table.lastActivityAt),
+    userStatusIdx: index("game_user_status_idx").on(table.userId, table.status),
+  }),
+);
+
+export const gamesRelations = relations(games, ({ one }) => ({
+  user: one(users, {
+    fields: [games.userId],
+    references: [users.id],
+    relationName: "user",
+  }),
+}));

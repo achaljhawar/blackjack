@@ -9,11 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { signIn } from "next-auth/react";
-
-interface LoginDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
+import type { LoginDialogProps } from "@/models/components";
 
 export function LoginDialog({ open, onOpenChange }: LoginDialogProps) {
   const handleGoogleSignIn = async () => {

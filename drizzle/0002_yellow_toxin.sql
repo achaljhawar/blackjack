@@ -1,0 +1,1 @@
+ALTER TABLE "blackjack_user" ADD COLUMN "currentBalance" integer DEFAULT 250 NOT NULL;

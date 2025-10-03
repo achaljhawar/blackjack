@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Spade } from "lucide-react";
 import { useState } from "react";
-import { LoginDialog } from "@/components/login-dialog";
+import { LoginDialog } from "./login-dialog";
 
 export function Hero() {
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);

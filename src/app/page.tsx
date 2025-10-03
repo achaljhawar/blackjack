@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import { Header } from "@/components/header";
-import { Hero } from "@/components/hero";
-import { GameOverview } from "@/components/game-overview";
-import { HowToPlay } from "@/components/how-to-play";
-import { Leaderboard } from "@/components/leaderboard";
-import { Footer } from "@/components/footer";
+import { Hero } from "@/components/landing/hero";
+import { GameOverview } from "@/components/landing/game-overview";
+import { HowToPlay } from "@/components/landing/how-to-play";
+import { Leaderboard } from "@/components/landing/leaderboard";
+import { Footer } from "@/components/landing/footer";
 import { auth } from "@/server/auth";
 
 export default async function Home() {
@@ -16,7 +15,6 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen">
-      <Header />
       <main>
         <Hero />
         <GameOverview />
