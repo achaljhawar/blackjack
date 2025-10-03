@@ -30,6 +30,7 @@
     "@t3-oss/env-nextjs": "^0.12.0",
     "@upstash/redis": "^1.35.4",
     "blackjack": ".",
+    "blackjack": ".",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.41.0",
