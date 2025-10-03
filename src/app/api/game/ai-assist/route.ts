@@ -116,7 +116,7 @@ Provide your recommendation in JSON format.`;
     const responseText = response.text!;
 
     // Extract JSON from response (handle code blocks)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const jsonMatch = /\{[\s\S]*\}/.exec(responseText);
     if (!jsonMatch) {
       return NextResponse.json(
         { success: false, error: "Invalid AI response" },
