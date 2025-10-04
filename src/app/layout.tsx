@@ -6,6 +6,7 @@ import { SessionProvider } from "next-auth/react";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BalanceProvider } from "@/lib/balance-context";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Blackjack",
@@ -32,6 +33,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <BalanceProvider>
+              <Analytics />
               <Navbar />
               {children}
             </BalanceProvider>
