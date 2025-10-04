@@ -48,160 +48,23 @@ export async function POST(request: Request) {
     let dealerHand = cachedGame.dealerHand;
     let dealerValue = calculateHandValue(dealerHand);
 
-    // Check if dealer needs to hit (hits on 16 or less)
-    const needsCard = dealerValue < 17;
+    // Draw one card for the dealer
+    const newCard = drawCard();
+    dealerHand = [...dealerHand, newCard];
+    dealerValue = calculateHandValue(dealerHand);
 
-    if (needsCard) {
-      // Draw one card for the dealer
-      const newCard = drawCard();
-      dealerHand = [...dealerHand, newCard];
-      dealerValue = calculateHandValue(dealerHand);
+    // Check if dealer still needs more cards
+    const stillNeedsCard = dealerValue < 17;
 
-      // Check if dealer still needs more cards (must be < 17 and not busted)
-      const stillNeedsCard = dealerValue < 17;
-
-      // If dealer reached 17+ or busted, we need to settle the game
-      if (!stillNeedsCard) {
-        // Game is complete - settle it
-        const playerValue = calculateHandValue(cachedGame.playerHand);
-
-        let result: "win" | "lose" | "push" | "blackjack";
-        if (dealerValue > 21) {
-          result = "win";
-        } else if (playerValue > dealerValue) {
-          result = "win";
-        } else if (playerValue < dealerValue) {
-          result = "lose";
-        } else {
-          result = "push";
-        }
-
-        const finalGame: GameState = {
-          ...cachedGame,
-          dealerHand,
-          status: "completed",
-          result,
-          playerScore: playerValue,
-          dealerScore: dealerValue,
-          completedAt: new Date(),
-        };
-
-        // Calculate winnings
-        let winnings = 0;
-        let transactionType = "";
-
-        switch (result) {
-          case "win":
-            winnings = finalGame.betAmount * 2;
-            transactionType = "bet_won";
-            break;
-          case "push":
-            winnings = finalGame.betAmount;
-            transactionType = "bet_push";
-            break;
-          case "lose":
-            winnings = 0;
-            transactionType = "bet_lost";
-            break;
-        }
-
-        // Persist final game state and update balance
-        try {
-          await db.transaction(async (tx) => {
-            const user = await tx.query.users.findFirst({
-              where: eq(users.id, session.user.id),
-              columns: {
-                currentBalance: true,
-                totalWagered: true,
-                totalWins: true,
-                totalLosses: true,
-                totalPushes: true,
-              },
-            });
-
-            if (!user) throw new Error("User not found");
-
-            // Update user stats (wagered was already incremented in /api/game/deal)
-            await tx
-              .update(users)
-              .set({
-                totalWins:
-                  result === "win" ? user.totalWins + 1 : user.totalWins,
-                totalLosses:
-                  result === "lose" ? user.totalLosses + 1 : user.totalLosses,
-                totalPushes:
-                  result === "push" ? user.totalPushes + 1 : user.totalPushes,
-              })
-              .where(eq(users.id, session.user.id));
-
-            // Update game in database
-            await tx
-              .update(games)
-              .set({
-                playerHand: finalGame.playerHand,
-                dealerHand: finalGame.dealerHand,
-                status: finalGame.status,
-                result: finalGame.result,
-                playerScore: finalGame.playerScore,
-                dealerScore: finalGame.dealerScore,
-                completedAt: finalGame.completedAt,
-                lastActivityAt: new Date(),
-                lastAction: "dealer_card",
-              })
-              .where(eq(games.id, gameId));
-
-            // Record transaction
-            await tx.insert(transactions).values({
-              id: crypto.randomUUID(),
-              userId: session.user.id,
-              type: transactionType,
-              amount: winnings,
-              balanceBefore: user.currentBalance,
-              balanceAfter: user.currentBalance + winnings,
-              gameId,
-              metadata: {
-                betAmount: finalGame.betAmount,
-                playerScore: finalGame.playerScore,
-                dealerScore: finalGame.dealerScore,
-                result: finalGame.result,
-                winnings,
-              },
-            });
-          });
-        } catch (error) {
-          await invalidateBalance(session.user.id);
-          throw error;
-        }
-
-        // Credit winnings
-        const balanceResult = await creditWinnings(session.user.id, winnings);
-
-        // Clear game from Redis cache
-        await redis.del(gameKey(gameId));
-        await redis.del(userActiveGameKey(session.user.id));
-
-        return NextResponse.json({
-          success: true,
-          game: finalGame,
-          needsMoreCards: false,
-          gameComplete: true,
-          newBalance: balanceResult.balance,
-          dealerValue,
-        });
-      }
-
-      // Dealer needs more cards, update cache and continue
+    if (stillNeedsCard) {
+      // Update cache only (no DB write for intermediate states)
       const updatedGame: GameState = {
         ...cachedGame,
         dealerHand,
         dealerScore: dealerValue,
       };
 
-      await redis.setex(
-        gameKey(gameId),
-        60 * 60, // 1 hour TTL
-        JSON.stringify(updatedGame),
-      );
+      await redis.setex(gameKey(gameId), 60 * 60, JSON.stringify(updatedGame));
 
       return NextResponse.json({
         success: true,
@@ -211,7 +74,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Dealer is done hitting, determine winner
+    // Dealer is done, settle the game
     const playerValue = calculateHandValue(cachedGame.playerHand);
 
     let result: "win" | "lose" | "push" | "blackjack";

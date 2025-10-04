@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import { db } from "@/server/db";
-import { games } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
 import { stand } from "@/lib/server-blackjack";
 import type { GameState } from "@/models/game";
 import { redis, gameKey } from "@/server/redis";
@@ -42,29 +39,13 @@ export async function POST(request: Request) {
     // Execute stand (reveals dealer card) - DO NOT play dealer turn yet
     const updatedGame = stand(cachedGame);
 
-    // Update database with lastActivityAt and lastAction
-    await db
-      .update(games)
-      .set({
-        dealerHand: updatedGame.dealerHand,
-        status: updatedGame.status,
-        dealerScore: updatedGame.dealerScore,
-        lastActivityAt: new Date(),
-        lastAction: "stand",
-      })
-      .where(eq(games.id, gameId));
-
-    // Update cache with revealed dealer card state (dealer_turn status)
-    await redis.setex(
-      gameKey(gameId),
-      60 * 60, // 1 hour TTL
-      JSON.stringify(updatedGame),
-    );
+    // Update cache only (no DB write for intermediate state)
+    await redis.setex(gameKey(gameId), 60 * 60, JSON.stringify(updatedGame));
 
     return NextResponse.json({
       success: true,
       game: updatedGame,
-      needsDealerTurn: true, // Signal client to start progressive dealing
+      needsDealerTurn: true,
     });
   } catch (error) {
     console.error("Error standing:", error);

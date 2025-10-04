@@ -42,26 +42,30 @@ export async function POST(request: Request) {
     // Execute hit
     const updatedGame = hit(cachedGame);
 
-    // Update database with lastActivityAt and lastAction
-    await db
-      .update(games)
-      .set({
-        playerHand: updatedGame.playerHand,
-        status: updatedGame.status,
-        result: updatedGame.result,
-        playerScore: updatedGame.playerScore,
-        completedAt: updatedGame.completedAt,
-        lastActivityAt: new Date(),
-        lastAction: "hit",
-      })
-      .where(eq(games.id, gameId));
-
     // Update cache
     await redis.setex(
       gameKey(gameId),
       GAME_CACHE_TTL,
       JSON.stringify(updatedGame),
     );
+
+    // Only update DB if game is completed (bust)
+    if (updatedGame.status === "completed") {
+      await db
+        .update(games)
+        .set({
+          playerHand: updatedGame.playerHand,
+          dealerHand: updatedGame.dealerHand,
+          status: updatedGame.status,
+          result: updatedGame.result,
+          playerScore: updatedGame.playerScore,
+          dealerScore: updatedGame.dealerScore,
+          completedAt: updatedGame.completedAt,
+          lastActivityAt: new Date(),
+          lastAction: "hit",
+        })
+        .where(eq(games.id, gameId));
+    }
 
     return NextResponse.json({
       success: true,
