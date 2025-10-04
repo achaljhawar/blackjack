@@ -23,7 +23,7 @@ export const users = createTable("user", {
     withTimezone: true,
   }).defaultNow(),
   image: varchar("image", { length: 255 }),
-  currentBalance: integer("currentBalance").notNull().default(250),
+  currentBalance: integer("currentBalance").notNull().default(500),
   totalWagered: integer("totalWagered").notNull().default(0),
   totalWins: integer("totalWins").notNull().default(0),
   totalLosses: integer("totalLosses").notNull().default(0),

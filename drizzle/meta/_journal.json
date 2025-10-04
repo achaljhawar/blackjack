@@ -64,6 +64,13 @@
       "when": 1759502074233,
       "tag": "0008_gigantic_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1759572798041,
+      "tag": "0009_complete_legion",
+      "breakpoints": true
     }
   ]
 }
