@@ -123,11 +123,10 @@ export async function POST(request: Request) {
 
             if (!user) throw new Error("User not found");
 
-            // Update user stats
+            // Update user stats (wagered was already incremented in /api/game/deal)
             await tx
               .update(users)
               .set({
-                totalWagered: user.totalWagered + finalGame.betAmount,
                 totalWins:
                   result === "win" ? user.totalWins + 1 : user.totalWins,
                 totalLosses:
@@ -276,11 +275,10 @@ export async function POST(request: Request) {
 
         if (!user) throw new Error("User not found");
 
-        // Update user stats
+        // Update user stats (wagered was already incremented in /api/game/deal)
         await tx
           .update(users)
           .set({
-            totalWagered: user.totalWagered + finalGame.betAmount,
             totalWins: result === "win" ? user.totalWins + 1 : user.totalWins,
             totalLosses:
               result === "lose" ? user.totalLosses + 1 : user.totalLosses,

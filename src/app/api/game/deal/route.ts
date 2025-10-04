@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
-import { games } from "@/server/db/schema";
+import { games, users } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 import { initializeGame } from "@/lib/server-blackjack";
 import {
   redis,
@@ -53,6 +54,19 @@ export async function POST(request: Request) {
 
         // Initialize game state
         const gameState = initializeGame(gameId, session.user.id, betAmount);
+
+        // Update totalWagered stat
+        const user = await tx.query.users.findFirst({
+          where: eq(users.id, session.user.id),
+          columns: { totalWagered: true },
+        });
+
+        if (!user) throw new Error("User not found");
+
+        await tx
+          .update(users)
+          .set({ totalWagered: user.totalWagered + betAmount })
+          .where(eq(users.id, session.user.id));
 
         // Persist initial game state to DB
         await tx.insert(games).values({
