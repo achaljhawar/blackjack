@@ -138,7 +138,7 @@ export function initializeGame(
     if (dealerBlackjack) {
       gameState.result = "push";
     } else {
-      gameState.result = "blackjack";
+      gameState.result = "win";
     }
   }
 
@@ -222,7 +222,7 @@ export function playDealerTurn(gameState: GameState): GameState {
   const playerValue = calculateHandValue(gameState.playerHand);
 
   // Determine winner
-  let result: "win" | "lose" | "push" | "blackjack";
+  let result: "win" | "lose" | "push";
 
   if (dealerValue > 21) {
     result = "win";
