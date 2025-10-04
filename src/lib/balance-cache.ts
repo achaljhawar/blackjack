@@ -118,7 +118,9 @@ export async function adjustBalance(
       const newBalance = current.balance + adjustment;
 
       if (newBalance < 0) {
-        throw new Error("Insufficient balance");
+        throw new Error(
+          "Insufficient balance. Please purchase more chips to continue playing.",
+        );
       }
 
       // Attempt optimistic update
@@ -130,7 +132,9 @@ export async function adjustBalance(
       ) {
         retries++;
         if (retries >= maxRetries) {
-          throw new Error("Failed to update balance after maximum retries");
+          throw new Error(
+            "Balance update failed due to high server load. Please try again in a moment.",
+          );
         }
         // Small delay before retry
         await new Promise((resolve) => setTimeout(resolve, 50 * retries));
@@ -140,7 +144,9 @@ export async function adjustBalance(
     }
   }
 
-  throw new Error("Failed to adjust balance");
+  throw new Error(
+    "Balance update failed. Please refresh the page and try again.",
+  );
 }
 
 /**

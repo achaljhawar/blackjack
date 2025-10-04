@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not dealer's turn" }, { status: 400 });
     }
 
-    let { dealerHand, deck } = cachedGame;
+    let dealerHand = cachedGame.dealerHand;
     let dealerValue = calculateHandValue(dealerHand);
 
     // Check if dealer needs to hit (hits on 16 or less)
@@ -53,9 +53,8 @@ export async function POST(request: Request) {
 
     if (needsCard) {
       // Draw one card for the dealer
-      const { card: newCard, remainingDeck } = drawCard(deck);
+      const newCard = drawCard();
       dealerHand = [...dealerHand, newCard];
-      deck = remainingDeck;
       dealerValue = calculateHandValue(dealerHand);
 
       // Check if dealer still needs more cards (must be < 17 and not busted)
@@ -80,7 +79,6 @@ export async function POST(request: Request) {
         const finalGame: GameState = {
           ...cachedGame,
           dealerHand,
-          deck,
           status: "completed",
           result,
           playerScore: playerValue,
@@ -142,7 +140,6 @@ export async function POST(request: Request) {
               .set({
                 playerHand: finalGame.playerHand,
                 dealerHand: finalGame.dealerHand,
-                deck: finalGame.deck,
                 status: finalGame.status,
                 result: finalGame.result,
                 playerScore: finalGame.playerScore,
@@ -197,7 +194,6 @@ export async function POST(request: Request) {
       const updatedGame: GameState = {
         ...cachedGame,
         dealerHand,
-        deck,
         dealerScore: dealerValue,
       };
 
@@ -232,7 +228,6 @@ export async function POST(request: Request) {
     const finalGame: GameState = {
       ...cachedGame,
       dealerHand,
-      deck,
       status: "completed",
       result,
       playerScore: playerValue,
@@ -293,7 +288,6 @@ export async function POST(request: Request) {
           .set({
             playerHand: finalGame.playerHand,
             dealerHand: finalGame.dealerHand,
-            deck: finalGame.deck,
             status: finalGame.status,
             result: finalGame.result,
             playerScore: finalGame.playerScore,

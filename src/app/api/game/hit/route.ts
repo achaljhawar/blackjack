@@ -47,7 +47,6 @@ export async function POST(request: Request) {
       .update(games)
       .set({
         playerHand: updatedGame.playerHand,
-        deck: updatedGame.deck,
         status: updatedGame.status,
         result: updatedGame.result,
         playerScore: updatedGame.playerScore,

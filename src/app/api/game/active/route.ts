@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import { db } from "@/server/db";
-import { games } from "@/server/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
 import { redis, userActiveGameKey, gameKey } from "@/server/redis";
+import type { GameState } from "@/models/game";
 
 export async function GET() {
   try {
@@ -12,48 +10,51 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Policy: Page reload/refresh abandons any active games
-    // We abandon all active games for this user when they load the game page
+    // Check for active game in Redis cache
+    const activeGameId = await redis.get<string>(
+      userActiveGameKey(session.user.id),
+    );
 
-    // 1. Find any active games
-    const activeGames = await db.query.games.findMany({
-      where: and(
-        eq(games.userId, session.user.id),
-        inArray(games.status, ["playing", "dealer_turn"]),
-      ),
-      orderBy: (games, { desc }) => [desc(games.lastActivityAt)],
-    });
-
-    // 2. Forfeit all active games (page reload = bet lost)
-    if (activeGames.length > 0) {
-      await db
-        .update(games)
-        .set({
-          status: "completed",
-          result: "forfeit",
-          completedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(games.userId, session.user.id),
-            inArray(games.status, ["playing", "dealer_turn"]),
-          ),
-        );
-
-      // Clear games from Redis cache
-      for (const game of activeGames) {
-        await redis.del(gameKey(game.id));
-      }
+    if (!activeGameId) {
+      return NextResponse.json({
+        success: true,
+        game: null,
+      });
     }
 
-    // 3. Clear any cached games
-    await redis.del(userActiveGameKey(session.user.id));
+    // Fetch game state from Redis
+    const gameState = await redis.get<GameState>(gameKey(activeGameId));
 
-    // 4. Always return null (no game resumption)
+    if (!gameState) {
+      // Game expired from cache
+      await redis.del(userActiveGameKey(session.user.id));
+      return NextResponse.json({
+        success: true,
+        game: null,
+      });
+    }
+
+    // Only recover games that are in playing or dealer_turn status
+    if (gameState.status !== "playing" && gameState.status !== "dealer_turn") {
+      await redis.del(userActiveGameKey(session.user.id));
+      return NextResponse.json({
+        success: true,
+        game: null,
+      });
+    }
+
+    // Return the active game for recovery
     return NextResponse.json({
       success: true,
-      game: null,
-      resumed: false,
+      game: {
+        id: gameState.id,
+        playerHand: gameState.playerHand,
+        dealerHand: gameState.dealerHand,
+        currentBet: gameState.betAmount,
+        gameStatus: gameState.status,
+        playerScore: gameState.playerScore,
+        dealerScore: gameState.dealerScore,
+      },
     });
   } catch (error) {
     console.error("Error fetching active game:", error);

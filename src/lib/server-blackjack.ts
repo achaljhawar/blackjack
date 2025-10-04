@@ -17,44 +17,16 @@ const RANKS: Rank[] = [
   "K",
 ];
 
-// Create a shuffled deck using Fisher-Yates algorithm with seed
-export function createShuffledDeck(seed: number): Card[] {
-  const deck: Card[] = [];
+// Infinite deck: Draw a random card on-demand
+export function drawCard(faceDown = false): Card {
+  const randomSuit = SUITS[Math.floor(Math.random() * SUITS.length)]!;
+  const randomRank = RANKS[Math.floor(Math.random() * RANKS.length)]!;
 
-  // Create 6 decks (typical casino blackjack)
-  for (let i = 0; i < 6; i++) {
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        deck.push({ rank, suit });
-      }
-    }
-  }
-
-  // Seeded random shuffle (Fisher-Yates)
-  let random = seed;
-  const seededRandom = () => {
-    random = (random * 9301 + 49297) % 233280;
-    return random / 233280;
+  return {
+    rank: randomRank,
+    suit: randomSuit,
+    faceDown,
   };
-
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(seededRandom() * (i + 1));
-    [deck[i], deck[j]] = [deck[j]!, deck[i]!];
-  }
-
-  return deck;
-}
-
-// Draw a card from the deck
-export function drawCard(
-  deck: Card[],
-  faceDown = false,
-): { card: Card; remainingDeck: Card[] } {
-  if (deck.length === 0) {
-    throw new Error("Deck is empty");
-  }
-  const [card, ...remainingDeck] = deck;
-  return { card: { ...card!, faceDown }, remainingDeck };
 }
 
 // Calculate hand value
@@ -90,17 +62,11 @@ export function initializeGame(
   userId: string,
   betAmount: number,
 ): GameState {
-  // Use timestamp as seed for reproducibility
-  const seed = Date.now();
-  let deck = createShuffledDeck(seed);
-
-  // Deal initial cards
-  const { card: playerCard1, remainingDeck: deck1 } = drawCard(deck);
-  const { card: dealerCard1, remainingDeck: deck2 } = drawCard(deck1);
-  const { card: playerCard2, remainingDeck: deck3 } = drawCard(deck2);
-  const { card: dealerCard2, remainingDeck: deck4 } = drawCard(deck3, true); // Dealer's second card face down
-
-  deck = deck4;
+  // Deal initial cards from infinite deck
+  const playerCard1 = drawCard();
+  const dealerCard1 = drawCard();
+  const playerCard2 = drawCard();
+  const dealerCard2 = drawCard(true); // Dealer's second card face down
 
   const playerHand = [playerCard1, playerCard2];
   const dealerHand = [dealerCard1, dealerCard2];
@@ -113,7 +79,7 @@ export function initializeGame(
     userId,
     playerHand,
     dealerHand,
-    deck,
+    deck: [], // Empty deck for infinite deck mode
     betAmount,
     status: isBlackjack ? "dealer_turn" : "playing",
     createdAt: new Date(),
@@ -151,7 +117,7 @@ export function hit(gameState: GameState): GameState {
     throw new Error("Cannot hit in current game state");
   }
 
-  const { card: newCard, remainingDeck } = drawCard(gameState.deck);
+  const newCard = drawCard();
   const playerHand = [...gameState.playerHand, newCard];
   const playerValue = calculateHandValue(playerHand);
 
@@ -167,7 +133,6 @@ export function hit(gameState: GameState): GameState {
       ...gameState,
       playerHand,
       dealerHand,
-      deck: remainingDeck,
       status: "completed",
       result: "lose",
       playerScore: playerValue,
@@ -179,7 +144,6 @@ export function hit(gameState: GameState): GameState {
   return {
     ...gameState,
     playerHand,
-    deck: remainingDeck,
   };
 }
 
@@ -208,14 +172,13 @@ export function playDealerTurn(gameState: GameState): GameState {
     throw new Error("Not dealer's turn");
   }
 
-  let { dealerHand, deck } = gameState;
+  let dealerHand = gameState.dealerHand;
   let dealerValue = calculateHandValue(dealerHand);
 
   // Dealer hits on 16 or less
   while (dealerValue < 17) {
-    const { card: newCard, remainingDeck } = drawCard(deck);
+    const newCard = drawCard();
     dealerHand = [...dealerHand, newCard];
-    deck = remainingDeck;
     dealerValue = calculateHandValue(dealerHand);
   }
 
@@ -237,7 +200,6 @@ export function playDealerTurn(gameState: GameState): GameState {
   return {
     ...gameState,
     dealerHand,
-    deck,
     status: "completed",
     result,
     playerScore: playerValue,

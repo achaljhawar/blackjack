@@ -11,6 +11,7 @@ import {
   GAME_CACHE_TTL,
 } from "@/server/redis";
 import { deductBet, invalidateBalance } from "@/lib/balance-cache";
+import type { GameState } from "@/models/game";
 
 export async function POST(request: Request) {
   try {
@@ -29,19 +30,33 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check for existing active game (concurrent game prevention)
+    const activeGameId = await redis.get<string>(
+      userActiveGameKey(session.user.id),
+    );
+    if (activeGameId) {
+      const activeGame = await redis.get<GameState>(gameKey(activeGameId));
+      if (
+        activeGame &&
+        (activeGame.status === "playing" || activeGame.status === "dealer_turn")
+      ) {
+        return NextResponse.json(
+          {
+            error: "You already have an active game. Please complete it first.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     // Deduct bet with balance cache integration
     let balanceResult;
     try {
       balanceResult = await deductBet(session.user.id, betAmount);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("Insufficient balance")
-      ) {
-        return NextResponse.json(
-          { error: "Insufficient balance" },
-          { status: 400 },
-        );
+      if (error instanceof Error) {
+        // Pass through the detailed error message from balance-cache
+        return NextResponse.json({ error: error.message }, { status: 400 });
       }
       throw error;
     }
@@ -75,7 +90,7 @@ export async function POST(request: Request) {
           betAmount: gameState.betAmount,
           playerHand: gameState.playerHand,
           dealerHand: gameState.dealerHand,
-          deck: gameState.deck,
+          deck: [], // Empty deck for infinite deck mode
           status: gameState.status,
           result: gameState.result,
           playerScore: gameState.playerScore,

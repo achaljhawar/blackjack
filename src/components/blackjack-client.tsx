@@ -67,7 +67,7 @@ export default function BlackjackClient() {
   const dealerValue =
     gameState.dealerScore ?? calculateHandValue(gameState.dealerHand);
 
-  // Fetch balance on mount - any active games will be abandoned on reload
+  // Fetch balance and check for active game on mount
   useEffect(() => {
     const initialize = async () => {
       try {
@@ -76,9 +76,20 @@ export default function BlackjackClient() {
         const currentBalance = balance ?? 0;
         setGameState((prev) => ({ ...prev, playerChips: currentBalance }));
 
-        // Note: We do NOT check for active games here
-        // Reloading/refreshing the page will cause any active game to be abandoned
-        // This is intentional - users lose their bet if they reload
+        // Check for active game and attempt recovery
+        const response = await fetch("/api/game/active");
+        const data = (await response.json()) as {
+          success: boolean;
+          game?: ClientGameState;
+        };
+
+        if (data.success && data.game) {
+          // Recover the active game
+          setGameState({
+            ...data.game,
+            playerChips: currentBalance,
+          });
+        }
       } catch (error) {
         console.error("Failed to initialize:", error);
       }
@@ -463,17 +474,6 @@ export default function BlackjackClient() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col">
-      {/* Warning about page reload */}
-      {(gameState.gameStatus === "playing" ||
-        gameState.gameStatus === "dealer_turn") && (
-        <div className="border-b-border bg-destructive/10 border-b px-4 py-2 text-center">
-          <p className="text-destructive text-xs font-medium sm:text-sm">
-            ⚠️ Warning: Refreshing or leaving this page will abandon your game
-            and you will lose your bet!
-          </p>
-        </div>
-      )}
-
       {/* Game Area */}
       <main className="flex flex-1 flex-col items-center justify-center gap-4 p-4 sm:gap-12 sm:p-8">
         {/* Dealer's Hand */}
