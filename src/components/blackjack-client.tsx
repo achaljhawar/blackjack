@@ -591,6 +591,7 @@ export default function BlackjackClient() {
                   className="border-border bg-card text-foreground focus:ring-ring w-48 rounded-lg border px-3 py-2 text-center text-lg font-semibold focus:ring-2 focus:outline-none sm:w-64 sm:px-4 sm:py-3 sm:text-xl"
                   min="1"
                   max={gameState.playerChips}
+                  step="1"
                   disabled={isInitializing}
                 />
                 <div className="flex gap-2 sm:gap-3">
