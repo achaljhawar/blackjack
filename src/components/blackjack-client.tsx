@@ -59,6 +59,7 @@ export default function BlackjackClient() {
   const [betError, setBetError] = useState<string>("");
   const [animatingCard, setAnimatingCard] = useState<string | null>(null);
   const [isPlacingBet, setIsPlacingBet] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [isHitting, setIsHitting] = useState(false);
   const [isStanding, setIsStanding] = useState(false);
   const [aiAssist, setAiAssist] = useState<{
@@ -81,6 +82,7 @@ export default function BlackjackClient() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        setIsInitializing(true);
         // Fetch balance
         await refreshBalance();
         const currentBalance = balance ?? 0;
@@ -102,6 +104,8 @@ export default function BlackjackClient() {
         }
       } catch (error) {
         console.error("Failed to initialize:", error);
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -231,7 +235,7 @@ export default function BlackjackClient() {
 
     if (!validation.success) {
       const errorMessage =
-        validation.error?.errors?.[0]?.message || "Invalid bet";
+        validation.error?.errors?.[0]?.message ?? "Invalid bet";
       setBetError(errorMessage);
       return;
     }
@@ -569,57 +573,71 @@ export default function BlackjackClient() {
         {/* Betting Interface */}
         {gameState.gameStatus === "betting" && (
           <div className="flex flex-col items-center gap-3 sm:gap-4">
-            <input
-              type="number"
-              value={betInput}
-              onChange={(e) => {
-                setBetInput(e.target.value);
-                setBetError(""); // Clear error when user types
-              }}
-              className="border-border bg-card text-foreground focus:ring-ring w-48 rounded-lg border px-3 py-2 text-center text-lg font-semibold focus:ring-2 focus:outline-none sm:w-64 sm:px-4 sm:py-3 sm:text-xl"
-              min="1"
-              max={gameState.playerChips}
-            />
-            <div className="flex gap-2 sm:gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => adjustBet(5)}
-                className="sm:text-base"
-              >
-                +5
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => adjustBet(25)}
-                className="sm:text-base"
-              >
-                +25
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => adjustBet(100)}
-                className="sm:text-base"
-              >
-                +100
-              </Button>
-            </div>
-            <Button
-              className="w-48 py-4 text-base font-semibold sm:w-64 sm:py-6 sm:text-lg"
-              onClick={handlePlaceBet}
-              disabled={isPlacingBet}
-            >
-              {isPlacingBet ? "Placing Bet..." : "Place Bet"}
-            </Button>
-            {betError && (
-              <p className="text-xs text-red-400 sm:text-sm">{betError}</p>
-            )}
-            {gameState.message && (
-              <p className="text-xs text-red-400 sm:text-sm">
-                {gameState.message}
-              </p>
+            {isInitializing ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-muted-foreground animate-pulse text-base font-semibold sm:text-xl">
+                  Checking for active games...
+                </div>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  value={betInput}
+                  onChange={(e) => {
+                    setBetInput(e.target.value);
+                    setBetError(""); // Clear error when user types
+                  }}
+                  className="border-border bg-card text-foreground focus:ring-ring w-48 rounded-lg border px-3 py-2 text-center text-lg font-semibold focus:ring-2 focus:outline-none sm:w-64 sm:px-4 sm:py-3 sm:text-xl"
+                  min="1"
+                  max={gameState.playerChips}
+                  disabled={isInitializing}
+                />
+                <div className="flex gap-2 sm:gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => adjustBet(5)}
+                    className="sm:text-base"
+                    disabled={isInitializing}
+                  >
+                    +5
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => adjustBet(25)}
+                    className="sm:text-base"
+                    disabled={isInitializing}
+                  >
+                    +25
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => adjustBet(100)}
+                    className="sm:text-base"
+                    disabled={isInitializing}
+                  >
+                    +100
+                  </Button>
+                </div>
+                <Button
+                  className="w-48 py-4 text-base font-semibold sm:w-64 sm:py-6 sm:text-lg"
+                  onClick={handlePlaceBet}
+                  disabled={isPlacingBet || isInitializing}
+                >
+                  {isPlacingBet ? "Placing Bet..." : "Place Bet"}
+                </Button>
+                {betError && (
+                  <p className="text-xs text-red-400 sm:text-sm">{betError}</p>
+                )}
+                {gameState.message && (
+                  <p className="text-xs text-red-400 sm:text-sm">
+                    {gameState.message}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}
