@@ -11,6 +11,15 @@ import type {
   DealerCardResponse,
 } from "@/models/api";
 import { useBalance } from "@/lib/balance-context";
+import { z } from "zod";
+
+// Zod schema for bet validation
+const createBetSchema = (maxBalance: number) =>
+  z
+    .number()
+    .positive("Bet must be greater than 0")
+    .max(maxBalance, `Maximum bet is ${maxBalance}`)
+    .int("Bet must be a whole number");
 
 function calculateHandValue(hand: Card[]): number {
   let value = 0;
@@ -47,6 +56,7 @@ export default function BlackjackClient() {
     gameStatus: "betting",
   });
   const [betInput, setBetInput] = useState<string>("100");
+  const [betError, setBetError] = useState<string>("");
   const [animatingCard, setAnimatingCard] = useState<string | null>(null);
   const [isPlacingBet, setIsPlacingBet] = useState(false);
   const [isHitting, setIsHitting] = useState(false);
@@ -207,9 +217,26 @@ export default function BlackjackClient() {
   }, [gameState.gameStatus]);
 
   const handlePlaceBet = async () => {
-    const bet = Number.parseInt(betInput);
-    if (isNaN(bet) || bet < 10) return;
+    const bet = Number(betInput);
 
+    // Check if bet is a valid number
+    if (isNaN(bet) || !Number.isFinite(bet)) {
+      setBetError("Please enter a valid number");
+      return;
+    }
+
+    // Validate bet using Zod
+    const betSchema = createBetSchema(gameState.playerChips);
+    const validation = betSchema.safeParse(bet);
+
+    if (!validation.success) {
+      const errorMessage =
+        validation.error?.errors?.[0]?.message || "Invalid bet";
+      setBetError(errorMessage);
+      return;
+    }
+
+    setBetError("");
     setIsPlacingBet(true);
 
     try {
@@ -466,10 +493,11 @@ export default function BlackjackClient() {
   const adjustBet = (amount: number) => {
     const currentBet = Number.parseInt(betInput) || 0;
     const newBet = Math.max(
-      10,
+      1,
       Math.min(gameState.playerChips, currentBet + amount),
     );
     setBetInput(newBet.toString());
+    setBetError(""); // Clear error when adjusting bet
   };
 
   return (
@@ -544,9 +572,12 @@ export default function BlackjackClient() {
             <input
               type="number"
               value={betInput}
-              onChange={(e) => setBetInput(e.target.value)}
+              onChange={(e) => {
+                setBetInput(e.target.value);
+                setBetError(""); // Clear error when user types
+              }}
               className="border-border bg-card text-foreground focus:ring-ring w-48 rounded-lg border px-3 py-2 text-center text-lg font-semibold focus:ring-2 focus:outline-none sm:w-64 sm:px-4 sm:py-3 sm:text-xl"
-              min="10"
+              min="1"
               max={gameState.playerChips}
             />
             <div className="flex gap-2 sm:gap-3">
@@ -582,6 +613,9 @@ export default function BlackjackClient() {
             >
               {isPlacingBet ? "Placing Bet..." : "Place Bet"}
             </Button>
+            {betError && (
+              <p className="text-xs text-red-400 sm:text-sm">{betError}</p>
+            )}
             {gameState.message && (
               <p className="text-xs text-red-400 sm:text-sm">
                 {gameState.message}
