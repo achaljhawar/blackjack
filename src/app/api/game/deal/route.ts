@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
-import { games, users } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { games, users, transactions } from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
 import { initializeGame } from "@/lib/server-blackjack";
-import {
-  redis,
-  gameKey,
-  userActiveGameKey,
-  GAME_CACHE_TTL,
-} from "@/server/redis";
-import { deductBet, invalidateBalance } from "@/lib/balance-cache";
-import type { GameState } from "@/models/game";
 
 export async function POST(request: Request) {
   try {
@@ -30,60 +22,59 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check for existing active game (concurrent game prevention)
-    const activeGameId = await redis.get<string>(
-      userActiveGameKey(session.user.id),
-    );
-    if (activeGameId) {
-      const activeGame = await redis.get<GameState>(gameKey(activeGameId));
-      if (
-        activeGame &&
-        (activeGame.status === "playing" || activeGame.status === "dealer_turn")
-      ) {
-        return NextResponse.json(
-          {
-            error: "You already have an active game. Please complete it first.",
-          },
-          { status: 400 },
-        );
-      }
-    }
+    // Check for existing active game in database
+    const activeGame = await db.query.games.findFirst({
+      where: and(
+        eq(games.userId, session.user.id),
+        eq(games.status, "playing")
+      ),
+    });
 
-    // Deduct bet with balance cache integration
-    let balanceResult;
-    try {
-      balanceResult = await deductBet(session.user.id, betAmount);
-    } catch (error) {
-      if (error instanceof Error) {
-        // Pass through the detailed error message from balance-cache
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
-      throw error;
+    if (activeGame) {
+      return NextResponse.json(
+        {
+          error: "You already have an active game. Please complete it first.",
+        },
+        { status: 400 },
+      );
     }
 
     // Create game in transaction
+    // Generate game ID and initialize game state BEFORE transaction
+    const gameId = crypto.randomUUID();
+    const gameState = initializeGame(gameId, session.user.id, betAmount);
+
     let result;
     try {
       result = await db.transaction(async (tx) => {
-        const gameId = crypto.randomUUID();
-
-        // Initialize game state
-        const gameState = initializeGame(gameId, session.user.id, betAmount);
-
-        // Update totalWagered stat
+        // Get user's current balance before deduction
         const user = await tx.query.users.findFirst({
           where: eq(users.id, session.user.id),
-          columns: { totalWagered: true },
+          columns: { currentBalance: true, totalWagered: true },
         });
 
         if (!user) throw new Error("User not found");
 
+        // Check if user has sufficient balance
+        if (user.currentBalance < betAmount) {
+          throw new Error(
+            "Insufficient balance. Please purchase more chips to continue playing.",
+          );
+        }
+
+        const balanceBefore = user.currentBalance;
+        const balanceAfter = balanceBefore - betAmount;
+
+        // Update user balance and totalWagered
         await tx
           .update(users)
-          .set({ totalWagered: user.totalWagered + betAmount })
+          .set({
+            currentBalance: balanceAfter,
+            totalWagered: user.totalWagered + betAmount,
+          })
           .where(eq(users.id, session.user.id));
 
-        // Persist initial game state to DB
+        // Persist fully initialized game state to DB
         await tx.insert(games).values({
           id: gameState.id,
           userId: gameState.userId,
@@ -101,31 +92,31 @@ export async function POST(request: Request) {
           lastAction: "bet_placed",
         });
 
-        return { gameState, balanceAfter: balanceResult.balance };
+        // Record bet transaction
+        await tx.insert(transactions).values({
+          id: crypto.randomUUID(),
+          userId: session.user.id,
+          type: "bet",
+          amount: -betAmount,
+          balanceBefore,
+          balanceAfter,
+          gameId: gameState.id,
+          metadata: {
+            betAmount,
+            action: "bet_placed",
+          },
+        });
+
+        return { balanceAfter };
       });
     } catch (error) {
-      // Rollback: refund the bet by invalidating cache to force DB sync
-      await invalidateBalance(session.user.id);
+      console.error("Supabase error while creating game:", error);
       throw error;
     }
 
-    // Cache game state in Redis with 1 hour TTL
-    await redis.setex(
-      gameKey(result.gameState.id),
-      GAME_CACHE_TTL,
-      JSON.stringify(result.gameState),
-    );
-
-    // Track user's active game
-    await redis.setex(
-      userActiveGameKey(session.user.id),
-      GAME_CACHE_TTL,
-      result.gameState.id,
-    );
-
     return NextResponse.json({
       success: true,
-      game: result.gameState,
+      game: gameState,
       balanceAfter: result.balanceAfter,
     });
   } catch (error) {

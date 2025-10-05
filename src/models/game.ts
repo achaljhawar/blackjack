@@ -28,7 +28,7 @@ export interface GameState {
   deck: Card[];
   betAmount: number;
   status: "playing" | "dealer_turn" | "completed" | "abandoned";
-  result?: "win" | "lose" | "push" | "blackjack" | "forfeit";
+  result?: "win" | "lose" | "push" | "forfeit";
   playerScore?: number;
   dealerScore?: number;
   createdAt: Date;
@@ -45,7 +45,7 @@ export interface GameHistoryEntry {
   dealerScore: number;
   playerHand: Card[];
   dealerHand: Card[];
-  result: "win" | "lose" | "push" | "blackjack" | "forfeit";
+  result: "win" | "lose" | "push" | "forfeit";
   winnings: number;
 }
 
@@ -56,7 +56,7 @@ export interface ClientGameState {
   playerChips: number;
   currentBet: number;
   gameStatus: "betting" | "playing" | "dealer_turn" | "gameOver";
-  result?: "win" | "lose" | "push" | "blackjack" | "forfeit";
+  result?: "win" | "lose" | "push" | "forfeit";
   message?: string;
   playerScore?: number;
   dealerScore?: number;

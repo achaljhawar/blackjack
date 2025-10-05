@@ -75,12 +75,7 @@ export default function HistoryClient({ initialHistory }: HistoryClientProps) {
   };
 
   const getResultDisplay = (entry: GameHistoryEntry) => {
-    if (entry.result === "blackjack") {
-      return {
-        text: `Blackjack (+${entry.winnings})`,
-        color: "text-green-500",
-      };
-    } else if (entry.result === "win") {
+    if (entry.result === "win") {
       return { text: `Win (+${entry.winnings})`, color: "text-green-500" };
     } else if (entry.result === "lose") {
       return { text: "Lose", color: "text-red-500" };

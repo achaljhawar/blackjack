@@ -12,6 +12,7 @@ import type {
 } from "@/models/api";
 import { useBalance } from "@/lib/balance-context";
 import { z } from "zod";
+import { toast } from "sonner";
 
 // Zod schema for bet validation
 const createBetSchema = (maxBalance: number) =>
@@ -70,8 +71,7 @@ export default function BlackjackClient() {
   const prevPlayerHandLength = useRef(0);
   const prevDealerHandLength = useRef(0);
   const prevDealerHadFaceDown = useRef(false);
-
-  const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
+  const hasResumedDealerTurn = useRef(false);
 
   const playerValue =
     gameState.playerScore ?? calculateHandValue(gameState.playerHand);
@@ -119,53 +119,91 @@ export default function BlackjackClient() {
     }
   }, [balance]);
 
-  // Heartbeat mechanism to keep game alive
+  // Resume dealer turn after recovery if game is in dealer_turn status
   useEffect(() => {
-    // Start heartbeat when game is active
-    if (
-      (gameState.gameStatus === "playing" ||
-        gameState.gameStatus === "dealer_turn") &&
-      gameState.id
-    ) {
-      // Clear any existing interval
-      if (heartbeatInterval.current) {
-        clearInterval(heartbeatInterval.current);
-      }
+    const resumeDealerTurn = async () => {
+      if (
+        gameState.gameStatus === "dealer_turn" &&
+        gameState.id &&
+        !isStanding &&
+        !isInitializing &&
+        !hasResumedDealerTurn.current
+      ) {
+        hasResumedDealerTurn.current = true;
+        setIsStanding(true);
 
-      // Send heartbeat every 60 seconds
-      heartbeatInterval.current = setInterval(() => {
-        if (gameState.id) {
-          void (async () => {
-            try {
-              await fetch("/api/game/heartbeat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ gameId: gameState.id }),
-              });
-            } catch (error) {
-              console.error("Heartbeat failed:", error);
+        const CARD_DELAY = 400;
+        try {
+          let needsMoreCards = true;
+
+          while (needsMoreCards) {
+            await new Promise((resolve) => setTimeout(resolve, CARD_DELAY));
+
+            const response = await fetch("/api/game/dealer-card", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ gameId: gameState.id }),
+            });
+
+            const data = (await response.json()) as DealerCardResponse;
+
+            if (!data.success || !data.game) {
+              setGameState((prev) => ({
+                ...prev,
+                message: data.error ?? "Failed to deal dealer card",
+              }));
+              setIsStanding(false);
+              return;
             }
-          })();
-        }
-      }, 60000); // Every 60 seconds
 
-      // Cleanup on unmount or status change
-      return () => {
-        if (heartbeatInterval.current) {
-          clearInterval(heartbeatInterval.current);
-          heartbeatInterval.current = null;
+            const game = data.game;
+
+            setGameState((prev) => ({
+              ...prev,
+              dealerHand: game.dealerHand,
+              dealerScore: game.dealerScore,
+            }));
+
+            needsMoreCards = data.needsMoreCards ?? false;
+
+            if (data.gameComplete) {
+              await new Promise((resolve) => setTimeout(resolve, 300));
+
+              let message = "";
+              if (game.result === "win") {
+                message =
+                  game.dealerScore && game.dealerScore > 21
+                    ? "Dealer busts! You win!"
+                    : "You win!";
+              } else if (game.result === "lose") {
+                message = "You lose.";
+              } else if (game.result === "push") {
+                message = "Push - tie game.";
+              }
+
+              setBalance(data.newBalance!);
+
+              setGameState((prev) => ({
+                ...prev,
+                playerChips: data.newBalance!,
+                gameStatus: "gameOver",
+                result: game.result,
+                message,
+              }));
+
+              setIsStanding(false);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to deal dealer cards:", error);
+          setIsStanding(false);
         }
-      };
-    } else {
-      // Clear heartbeat when game is not active
-      if (heartbeatInterval.current) {
-        clearInterval(heartbeatInterval.current);
-        heartbeatInterval.current = null;
       }
-    }
-  }, [gameState.gameStatus, gameState.id]);
+    };
 
-  // Removed dealer turn logic - now handled server-side
+    void resumeDealerTurn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.gameStatus, gameState.id, isInitializing]);
 
   useEffect(() => {
     let cardToAnimate: string | null = null;
@@ -216,6 +254,7 @@ export default function BlackjackClient() {
       prevPlayerHandLength.current = 0;
       prevDealerHandLength.current = 0;
       prevDealerHadFaceDown.current = false;
+      hasResumedDealerTurn.current = false;
       setAnimatingCard(null);
     }
   }, [gameState.gameStatus]);
@@ -253,9 +292,11 @@ export default function BlackjackClient() {
       const data = (await response.json()) as DealResponse;
 
       if (!data.success || !data.game) {
+        const errorMessage = data.error ?? "Failed to deal";
+        toast.error(errorMessage);
         setGameState({
           ...gameState,
-          message: data.error ?? "Failed to deal",
+          message: errorMessage,
         });
         setIsPlacingBet(false);
         return;
@@ -276,14 +317,15 @@ export default function BlackjackClient() {
         playerScore: data.game.playerScore,
         dealerScore: data.game.dealerScore,
         message:
-          data.game.result === "blackjack"
-            ? "Blackjack! You win!"
-            : data.game.result === "push"
-              ? "Both have Blackjack! Push."
+          data.game.result === "push"
+            ? "Both have Blackjack! Push."
+            : data.game.result === "win"
+              ? "Blackjack! You win!"
               : undefined,
       });
     } catch (error) {
       console.error("Failed to deal:", error);
+      toast.error("Failed to create game. Please try again.");
       setGameState({ ...gameState, message: "Failed to deal" });
     } finally {
       setIsPlacingBet(false);

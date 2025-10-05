@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
+import { db } from "@/server/db";
+import { games } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 import { stand } from "@/lib/server-blackjack";
 import type { GameState } from "@/models/game";
-import { redis, gameKey } from "@/server/redis";
 
 export async function POST(request: Request) {
   try {
@@ -21,26 +23,57 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch game state from Redis
-    const cachedGame = await redis.get<GameState>(gameKey(gameId));
+    // Fetch game state from database
+    const dbGame = await db.query.games.findFirst({
+      where: eq(games.id, gameId),
+    });
 
-    if (!cachedGame) {
+    if (!dbGame) {
       return NextResponse.json(
-        { error: "Game not found or expired" },
+        { error: "Game not found" },
         { status: 404 },
       );
     }
 
     // Verify game belongs to user
-    if (cachedGame.userId !== session.user.id) {
+    if (dbGame.userId !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Execute stand (reveals dealer card) - DO NOT play dealer turn yet
-    const updatedGame = stand(cachedGame);
+    // Convert DB game to GameState
+    const currentGame: GameState = {
+      id: dbGame.id,
+      userId: dbGame.userId,
+      betAmount: dbGame.betAmount,
+      playerHand: dbGame.playerHand,
+      dealerHand: dbGame.dealerHand,
+      deck: [],
+      status: dbGame.status as "playing" | "dealer_turn" | "completed",
+      result: dbGame.result as "win" | "lose" | "push" | "forfeit" | null,
+      playerScore: dbGame.playerScore,
+      dealerScore: dbGame.dealerScore,
+      createdAt: dbGame.createdAt,
+      completedAt: dbGame.completedAt,
+    };
 
-    // Update cache only (no DB write for intermediate state)
-    await redis.setex(gameKey(gameId), 60 * 60, JSON.stringify(updatedGame));
+    // Execute stand (reveals dealer card) - DO NOT play dealer turn yet
+    const updatedGame = stand(currentGame);
+
+    // Update database with new state
+    await db
+      .update(games)
+      .set({
+        playerHand: updatedGame.playerHand,
+        dealerHand: updatedGame.dealerHand,
+        status: updatedGame.status,
+        result: updatedGame.result,
+        playerScore: updatedGame.playerScore,
+        dealerScore: updatedGame.dealerScore,
+        completedAt: updatedGame.completedAt,
+        lastActivityAt: new Date(),
+        lastAction: "stand",
+      })
+      .where(eq(games.id, gameId));
 
     return NextResponse.json({
       success: true,

@@ -28,11 +28,9 @@ export default async function HistoryPage() {
       const winnings =
         game.result === "win"
           ? game.betAmount
-          : game.result === "blackjack"
-            ? Math.floor(game.betAmount * 1.5)
-            : game.result === "lose" || game.result === "forfeit"
-              ? -game.betAmount
-              : 0;
+          : game.result === "lose" || game.result === "forfeit"
+            ? -game.betAmount
+            : 0;
 
       return {
         id: game.id,
@@ -42,12 +40,7 @@ export default async function HistoryPage() {
         dealerScore: game.dealerScore ?? 0,
         playerHand: game.playerHand as Card[],
         dealerHand: game.dealerHand as Card[],
-        result: game.result as
-          | "win"
-          | "lose"
-          | "push"
-          | "blackjack"
-          | "forfeit",
+        result: game.result as "win" | "lose" | "push" | "forfeit",
         winnings,
       };
     });

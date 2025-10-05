@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
-import { redis, userActiveGameKey, gameKey } from "@/server/redis";
-import type { GameState } from "@/models/game";
+import { db } from "@/server/db";
+import { games } from "@/server/db/schema";
+import { and, eq, or } from "drizzle-orm";
 
 export async function GET() {
   try {
@@ -10,33 +11,19 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check for active game in Redis cache
-    const activeGameId = await redis.get<string>(
-      userActiveGameKey(session.user.id),
-    );
+    // Check for active game in database
+    const activeGame = await db.query.games.findFirst({
+      where: and(
+        eq(games.userId, session.user.id),
+        or(
+          eq(games.status, "playing"),
+          eq(games.status, "dealer_turn")
+        )
+      ),
+      orderBy: (games, { desc }) => [desc(games.createdAt)],
+    });
 
-    if (!activeGameId) {
-      return NextResponse.json({
-        success: true,
-        game: null,
-      });
-    }
-
-    // Fetch game state from Redis
-    const gameState = await redis.get<GameState>(gameKey(activeGameId));
-
-    if (!gameState) {
-      // Game expired from cache
-      await redis.del(userActiveGameKey(session.user.id));
-      return NextResponse.json({
-        success: true,
-        game: null,
-      });
-    }
-
-    // Only recover games that are in playing or dealer_turn status
-    if (gameState.status !== "playing" && gameState.status !== "dealer_turn") {
-      await redis.del(userActiveGameKey(session.user.id));
+    if (!activeGame) {
       return NextResponse.json({
         success: true,
         game: null,
@@ -47,13 +34,13 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       game: {
-        id: gameState.id,
-        playerHand: gameState.playerHand,
-        dealerHand: gameState.dealerHand,
-        currentBet: gameState.betAmount,
-        gameStatus: gameState.status,
-        playerScore: gameState.playerScore,
-        dealerScore: gameState.dealerScore,
+        id: activeGame.id,
+        playerHand: activeGame.playerHand,
+        dealerHand: activeGame.dealerHand,
+        currentBet: activeGame.betAmount,
+        gameStatus: activeGame.status,
+        playerScore: activeGame.playerScore,
+        dealerScore: activeGame.dealerScore,
       },
     });
   } catch (error) {

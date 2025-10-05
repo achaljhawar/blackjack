@@ -7,6 +7,7 @@ import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BalanceProvider } from "@/lib/balance-context";
 import { Analytics } from "@vercel/analytics/next";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Blackjack",
@@ -34,6 +35,7 @@ export default function RootLayout({
           >
             <BalanceProvider>
               <Analytics />
+              <Toaster />
               <Navbar />
               {children}
             </BalanceProvider>
