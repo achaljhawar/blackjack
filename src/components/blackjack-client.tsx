@@ -280,6 +280,23 @@ export default function BlackjackClient() {
         return;
       }
 
+      // Verify game was saved to database before updating state
+      const verifyResponse = await fetch(`/api/game/active`);
+      const verifyData = (await verifyResponse.json()) as {
+        success: boolean;
+        game?: ClientGameState;
+      };
+
+      if (!verifyData.success || !verifyData.game || verifyData.game.id !== data.game.id) {
+        toast.error("Supabase error. Please try again.");
+        setGameState({
+          ...gameState,
+          message: "Supabase error",
+        });
+        setIsPlacingBet(false);
+        return;
+      }
+
       // Update balance in context (will propagate to navbar)
       setBalance(data.balanceAfter!);
 
