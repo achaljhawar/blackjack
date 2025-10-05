@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { games, users, transactions } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { initializeGame } from "@/lib/server-blackjack";
+import type { BetAmountRequest } from "@/models/api";
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as { betAmount: number };
+    const body = (await request.json()) as BetAmountRequest;
     const { betAmount } = body;
 
     if (!betAmount || betAmount < 10) {

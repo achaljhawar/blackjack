@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { adjustBalance, invalidateBalance } from "@/lib/balance-cache";
+import type { BuyChipsRequest } from "@/models/api";
 
 export async function POST(request: Request) {
   try {
@@ -13,8 +14,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as { amount: number };
-    const { amount } = body as { amount: number };
+    const body = (await request.json()) as BuyChipsRequest;
+    const { amount } = body;
 
     if (!amount || amount <= 0) {
       return NextResponse.json(

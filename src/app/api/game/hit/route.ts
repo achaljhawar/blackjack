@@ -4,7 +4,8 @@ import { db } from "@/server/db";
 import { games } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { hit } from "@/lib/server-blackjack";
-import type { GameState } from "@/models/game";
+import { dbGameToGameState } from "@/lib/game-converters";
+import type { GameIdRequest } from "@/models/api";
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as { gameId: string };
+    const body = (await request.json()) as GameIdRequest;
     const { gameId } = body;
 
     if (!gameId) {
@@ -40,21 +41,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Convert DB game to GameState
-    const currentGame: GameState = {
-      id: dbGame.id,
-      userId: dbGame.userId,
-      betAmount: dbGame.betAmount,
-      playerHand: dbGame.playerHand,
-      dealerHand: dbGame.dealerHand,
-      deck: [],
-      status: dbGame.status as "playing" | "dealer_turn" | "completed",
-      result: dbGame.result as "win" | "lose" | "push" | "forfeit" | null,
-      playerScore: dbGame.playerScore,
-      dealerScore: dbGame.dealerScore,
-      createdAt: dbGame.createdAt,
-      completedAt: dbGame.completedAt,
-    };
+    // Convert DB game to GameState using shared converter
+    const currentGame = dbGameToGameState(dbGame);
 
     // Execute hit
     const updatedGame = hit(currentGame);

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { auth } from "@/server/auth";
-import type { Card } from "@/models/game";
+import { calculateHandValue } from "@/lib/hand-value";
+import type { AiAssistRequest } from "@/models/api";
 import fs from "fs";
 import path from "path";
 
@@ -14,34 +15,6 @@ const SYSTEM_PROMPT = fs.readFileSync(
   "utf-8",
 );
 
-function calculateHandValue(hand: Card[]): { value: number; isSoft: boolean } {
-  let value = 0;
-  let aces = 0;
-
-  for (const card of hand) {
-    if (card.faceDown) continue;
-
-    if (card.rank === "A") {
-      aces += 1;
-      value += 11;
-    } else if (["J", "Q", "K"].includes(card.rank)) {
-      value += 10;
-    } else {
-      value += Number.parseInt(card.rank);
-    }
-  }
-
-  let isSoft = aces > 0 && value <= 21;
-
-  while (value > 21 && aces > 0) {
-    value -= 10;
-    aces -= 1;
-    isSoft = false;
-  }
-
-  return { value, isSoft };
-}
-
 export async function POST(request: Request) {
   try {
     const session = await auth();
@@ -52,10 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as {
-      playerHand: Card[];
-      dealerUpCard: Card;
-    };
+    const body = (await request.json()) as AiAssistRequest;
 
     const { playerHand, dealerUpCard } = body;
 

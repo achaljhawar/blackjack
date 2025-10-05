@@ -1,4 +1,5 @@
-import type { Suit, Rank, Card, GameState } from "@/models/game";
+import type { Suit, Rank, Card, GameState, GameResult } from "@/models/game";
+import { calculateHandValue, getHandValue } from "./hand-value";
 
 const SUITS: Suit[] = ["♠", "♥", "♦", "♣"];
 const RANKS: Rank[] = [
@@ -29,32 +30,8 @@ export function drawCard(faceDown = false): Card {
   };
 }
 
-// Calculate hand value
-export function calculateHandValue(hand: Card[]): number {
-  let value = 0;
-  let aces = 0;
-
-  for (const card of hand) {
-    if (card.faceDown) continue;
-
-    if (card.rank === "A") {
-      aces += 1;
-      value += 11;
-    } else if (["J", "Q", "K"].includes(card.rank)) {
-      value += 10;
-    } else {
-      value += Number.parseInt(card.rank);
-    }
-  }
-
-  // Adjust for aces
-  while (value > 21 && aces > 0) {
-    value -= 10;
-    aces -= 1;
-  }
-
-  return value;
-}
+// Re-export hand value functions
+export { calculateHandValue, getHandValue };
 
 // Initialize a new game with initial deal
 export function initializeGame(
@@ -71,7 +48,7 @@ export function initializeGame(
   const playerHand = [playerCard1, playerCard2];
   const dealerHand = [dealerCard1, dealerCard2];
 
-  const playerValue = calculateHandValue(playerHand);
+  const playerValue = getHandValue(playerHand);
   const isBlackjack = playerValue === 21 && playerHand.length === 2;
 
   const gameState: GameState = {
@@ -91,7 +68,7 @@ export function initializeGame(
       ...card,
       faceDown: false,
     }));
-    const dealerValue = calculateHandValue(revealedDealerHand);
+    const dealerValue = getHandValue(revealedDealerHand);
     const dealerBlackjack =
       dealerValue === 21 && revealedDealerHand.length === 2;
 
@@ -119,7 +96,7 @@ export function hit(gameState: GameState): GameState {
 
   const newCard = drawCard();
   const playerHand = [...gameState.playerHand, newCard];
-  const playerValue = calculateHandValue(playerHand);
+  const playerValue = getHandValue(playerHand);
 
   if (playerValue > 21) {
     // Player busts
@@ -127,7 +104,7 @@ export function hit(gameState: GameState): GameState {
       ...card,
       faceDown: false,
     }));
-    const dealerValue = calculateHandValue(dealerHand);
+    const dealerValue = getHandValue(dealerHand);
 
     return {
       ...gameState,
@@ -173,19 +150,19 @@ export function playDealerTurn(gameState: GameState): GameState {
   }
 
   let dealerHand = gameState.dealerHand;
-  let dealerValue = calculateHandValue(dealerHand);
+  let dealerValue = getHandValue(dealerHand);
 
   // Dealer hits on 16 or less
   while (dealerValue < 17) {
     const newCard = drawCard();
     dealerHand = [...dealerHand, newCard];
-    dealerValue = calculateHandValue(dealerHand);
+    dealerValue = getHandValue(dealerHand);
   }
 
-  const playerValue = calculateHandValue(gameState.playerHand);
+  const playerValue = getHandValue(gameState.playerHand);
 
   // Determine winner
-  let result: "win" | "lose" | "push";
+  let result: GameResult;
 
   if (dealerValue > 21) {
     result = "win";

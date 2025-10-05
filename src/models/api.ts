@@ -1,4 +1,4 @@
-import type { GameState } from "./game";
+import type { GameState, Card, ClientGameState } from "./game";
 
 // API Response types
 export interface ApiResponse {
@@ -29,4 +29,33 @@ export interface DealerCardResponse extends ApiResponse {
 
 export interface BalanceResponse {
   balance: number;
+}
+
+export interface ActiveGameResponse extends ApiResponse {
+  game?: ClientGameState;
+}
+
+export interface AiAssistResponse extends ApiResponse {
+  recommendation?: {
+    action: "hit" | "stand";
+    reasoning: string;
+  };
+}
+
+// API Request types
+export interface GameIdRequest {
+  gameId: string;
+}
+
+export interface BetAmountRequest {
+  betAmount: number;
+}
+
+export interface BuyChipsRequest {
+  amount: number;
+}
+
+export interface AiAssistRequest {
+  playerHand: Card[];
+  dealerUpCard: Card;
 }

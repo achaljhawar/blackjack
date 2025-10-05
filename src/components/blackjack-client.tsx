@@ -3,12 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { PlayingCard } from "@/components/playing-card";
+import { getHandValue } from "@/lib/hand-value";
 import type { Card, ClientGameState } from "@/models/game";
 import type {
   DealResponse,
   HitResponse,
   StandResponse,
   DealerCardResponse,
+  ActiveGameResponse,
+  AiAssistResponse,
 } from "@/models/api";
 import { useBalance } from "@/lib/balance-context";
 import { z } from "zod";
@@ -21,31 +24,6 @@ const createBetSchema = (maxBalance: number) =>
     .positive("Bet must be greater than 0")
     .max(maxBalance, `Maximum bet is ${maxBalance}`)
     .int("Bet must be a whole number");
-
-function calculateHandValue(hand: Card[]): number {
-  let value = 0;
-  let aces = 0;
-
-  for (const card of hand) {
-    if (card.faceDown) continue;
-
-    if (card.rank === "A") {
-      aces += 1;
-      value += 11;
-    } else if (["J", "Q", "K"].includes(card.rank)) {
-      value += 10;
-    } else {
-      value += Number.parseInt(card.rank);
-    }
-  }
-
-  while (value > 21 && aces > 0) {
-    value -= 10;
-    aces -= 1;
-  }
-
-  return value;
-}
 
 export default function BlackjackClient() {
   const { balance, setBalance, refreshBalance } = useBalance();
@@ -74,9 +52,9 @@ export default function BlackjackClient() {
   const hasResumedDealerTurn = useRef(false);
 
   const playerValue =
-    gameState.playerScore ?? calculateHandValue(gameState.playerHand);
+    gameState.playerScore ?? getHandValue(gameState.playerHand);
   const dealerValue =
-    gameState.dealerScore ?? calculateHandValue(gameState.dealerHand);
+    gameState.dealerScore ?? getHandValue(gameState.dealerHand);
 
   // Fetch balance and check for active game on mount
   useEffect(() => {
@@ -399,8 +377,8 @@ export default function BlackjackClient() {
         playerHand: data.game.playerHand,
         dealerHand: data.game.dealerHand,
         gameStatus: "dealer_turn",
-        playerScore: calculateHandValue(data.game.playerHand),
-        dealerScore: calculateHandValue(data.game.dealerHand),
+        playerScore: getHandValue(data.game.playerHand),
+        dealerScore: getHandValue(data.game.dealerHand),
       });
 
       // Step 2: If dealer needs to play, progressively deal cards

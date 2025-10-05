@@ -3,8 +3,10 @@ import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { users, games, transactions } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { drawCard, calculateHandValue } from "@/lib/server-blackjack";
-import type { GameState, Card } from "@/models/game";
+import { drawCard, getHandValue } from "@/lib/server-blackjack";
+import { dbGameToGameState } from "@/lib/game-converters";
+import type { GameState, Card, GameResult, TransactionType } from "@/models/game";
+import type { GameIdRequest } from "@/models/api";
 import { creditWinnings, invalidateBalance } from "@/lib/balance-cache";
 
 export async function POST(request: Request) {
@@ -14,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as { gameId: string };
+    const body = (await request.json()) as GameIdRequest;
     const { gameId } = body;
 
     if (!gameId) {
@@ -47,14 +49,14 @@ export async function POST(request: Request) {
     }
 
     let dealerHand = dbGame.dealerHand as Card[];
-    let dealerValue = calculateHandValue(dealerHand);
+    let dealerValue = getHandValue(dealerHand);
 
     // Check if dealer needs a card BEFORE drawing
     if (dealerValue >= 17) {
       // Dealer is already done, settle the game immediately without drawing
-      const playerValue = calculateHandValue(dbGame.playerHand as Card[]);
+      const playerValue = getHandValue(dbGame.playerHand as Card[]);
 
-      let result: "win" | "lose" | "push";
+      let result: GameResult;
       if (dealerValue > 21) {
         result = "win";
       } else if (playerValue > dealerValue) {
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
 
       // Calculate winnings
       let winnings = 0;
-      let transactionType = "";
+      let transactionType: TransactionType;
 
       switch (result) {
         case "win":
@@ -182,27 +184,18 @@ export async function POST(request: Request) {
     // Draw one card for the dealer
     const newCard = drawCard();
     dealerHand = [...dealerHand, newCard];
-    dealerValue = calculateHandValue(dealerHand);
+    dealerValue = getHandValue(dealerHand);
 
     // Check if dealer still needs more cards
     const stillNeedsCard = dealerValue < 17;
 
     if (stillNeedsCard) {
-      // Update database with intermediate state
-      const updatedGame: GameState = {
-        id: dbGame.id,
-        userId: dbGame.userId,
-        betAmount: dbGame.betAmount,
-        playerHand: dbGame.playerHand as Card[],
+      // Update database with intermediate state using converter
+      const updatedGame = dbGameToGameState({
+        ...dbGame,
         dealerHand,
-        deck: [],
-        status: dbGame.status as "playing" | "dealer_turn" | "completed",
-        result: dbGame.result as "win" | "lose" | "push" | "forfeit" | undefined,
-        playerScore: dbGame.playerScore ?? undefined,
         dealerScore: dealerValue,
-        createdAt: dbGame.createdAt,
-        completedAt: dbGame.completedAt ?? undefined,
-      };
+      });
 
       await db
         .update(games)
@@ -223,9 +216,9 @@ export async function POST(request: Request) {
     }
 
     // Dealer is done, settle the game
-    const playerValue = calculateHandValue(dbGame.playerHand as Card[]);
+    const playerValue = getHandValue(dbGame.playerHand as Card[]);
 
-    let result: "win" | "lose" | "push";
+    let result: GameResult;
     if (dealerValue > 21) {
       result = "win";
     } else if (playerValue > dealerValue) {
@@ -253,7 +246,7 @@ export async function POST(request: Request) {
 
     // Calculate winnings
     let winnings = 0;
-    let transactionType = "";
+    let transactionType: TransactionType;
 
     switch (result) {
       case "win":

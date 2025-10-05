@@ -20,6 +20,18 @@ export interface Card {
   faceDown?: boolean;
 }
 
+// Centralized union types
+export type GameStatus = "playing" | "dealer_turn" | "completed" | "abandoned";
+export type GameResult = "win" | "lose" | "push" | "forfeit";
+export type TransactionType = "bet" | "bet_won" | "bet_lost" | "bet_push";
+export type GameAction = "bet_placed" | "hit" | "stand" | "dealer_card";
+
+// Hand value calculation result
+export interface HandValue {
+  value: number;
+  isSoft: boolean;
+}
+
 export interface GameState {
   id: string;
   userId: string;
@@ -27,8 +39,8 @@ export interface GameState {
   dealerHand: Card[];
   deck: Card[];
   betAmount: number;
-  status: "playing" | "dealer_turn" | "completed" | "abandoned";
-  result?: "win" | "lose" | "push" | "forfeit";
+  status: GameStatus;
+  result?: GameResult;
   playerScore?: number;
   dealerScore?: number;
   createdAt: Date;
@@ -45,7 +57,7 @@ export interface GameHistoryEntry {
   dealerScore: number;
   playerHand: Card[];
   dealerHand: Card[];
-  result: "win" | "lose" | "push" | "forfeit";
+  result: GameResult;
   winnings: number;
 }
 
@@ -56,7 +68,7 @@ export interface ClientGameState {
   playerChips: number;
   currentBet: number;
   gameStatus: "betting" | "playing" | "dealer_turn" | "gameOver";
-  result?: "win" | "lose" | "push" | "forfeit";
+  result?: GameResult;
   message?: string;
   playerScore?: number;
   dealerScore?: number;
