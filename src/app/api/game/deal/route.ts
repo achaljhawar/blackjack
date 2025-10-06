@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { games, users, transactions } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { initializeGame } from "@/lib/server-blackjack";
 import type { BetAmountRequest } from "@/models/api";
 
@@ -23,23 +23,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check for existing active game in database
-    const activeGame = await db.query.games.findFirst({
-      where: and(
-        eq(games.userId, session.user.id),
-        eq(games.status, "playing")
-      ),
-    });
-
-    if (activeGame) {
-      return NextResponse.json(
-        {
-          error: "You already have an active game. Please complete it first.",
-        },
-        { status: 400 },
-      );
-    }
-
     // Create game in transaction
     // Generate game ID and initialize game state BEFORE transaction
     const gameId = crypto.randomUUID();
@@ -48,6 +31,21 @@ export async function POST(request: Request) {
     let result;
     try {
       result = await db.transaction(async (tx) => {
+        // Check for existing active game INSIDE transaction to prevent race conditions
+        const activeGame = await tx.query.games.findFirst({
+          where: and(
+            eq(games.userId, session.user.id),
+            or(
+              eq(games.status, "playing"),
+              eq(games.status, "dealer_turn")
+            )
+          ),
+        });
+
+        if (activeGame) {
+          throw new Error("You already have an active game. Please complete it first.");
+        }
+
         // Get user's current balance before deduction
         const user = await tx.query.users.findFirst({
           where: eq(users.id, session.user.id),

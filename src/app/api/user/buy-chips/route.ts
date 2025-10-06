@@ -3,7 +3,7 @@ import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { adjustBalance, invalidateBalance } from "@/lib/balance-cache";
+import { invalidateBalance } from "@/lib/balance-cache";
 import type { BuyChipsRequest } from "@/models/api";
 
 export async function POST(request: Request) {
@@ -24,13 +24,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update total chips bought in DB transaction
+    // Update total chips bought and balance in a single DB transaction
+    let balanceAfter: number;
     try {
-      await db.transaction(async (tx) => {
+      balanceAfter = await db.transaction(async (tx) => {
         const user = await tx.query.users.findFirst({
           where: eq(users.id, session.user.id),
           columns: {
             totalChipsBought: true,
+            currentBalance: true,
           },
         });
 
@@ -39,13 +41,17 @@ export async function POST(request: Request) {
         }
 
         const newTotalChipsBought = user.totalChipsBought + amount;
+        const newBalance = user.currentBalance + amount;
 
         await tx
           .update(users)
           .set({
             totalChipsBought: newTotalChipsBought,
+            currentBalance: newBalance,
           })
           .where(eq(users.id, session.user.id));
+
+        return newBalance;
       });
     } catch (error) {
       // Invalidate cache on error to ensure consistency
@@ -53,12 +59,9 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    // Add chips to balance with cache integration (after successful transaction)
-    const balanceResult = await adjustBalance(session.user.id, amount);
-
     return NextResponse.json({
       success: true,
-      balance: balanceResult.balance,
+      balance: balanceAfter,
     });
   } catch (error) {
     console.error("Error buying chips:", error);

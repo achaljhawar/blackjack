@@ -27,7 +27,7 @@ export interface DealerCardResponse extends ApiResponse {
   newBalance?: number;
 }
 
-export interface BalanceResponse {
+export interface BalanceResponse extends ApiResponse {
   balance: number;
 }
 

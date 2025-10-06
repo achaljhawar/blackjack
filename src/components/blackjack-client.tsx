@@ -9,11 +9,9 @@ import type {
   DealResponse,
   HitResponse,
   StandResponse,
-  DealerCardResponse,
-  ActiveGameResponse,
-  AiAssistResponse,
+  DealerCardResponse
 } from "@/models/api";
-import { useBalance } from "@/lib/balance-context";
+import { useBalance } from "@/components/balance-context";
 import { z } from "zod";
 import { toast } from "sonner";
 
@@ -82,6 +80,7 @@ export default function BlackjackClient() {
         }
       } catch (error) {
         console.error("Failed to initialize:", error);
+        toast.error("Failed to load game. Please refresh the page.");
       } finally {
         setIsInitializing(false);
       }
@@ -126,9 +125,11 @@ export default function BlackjackClient() {
             const data = (await response.json()) as DealerCardResponse;
 
             if (!data.success || !data.game) {
+              const errorMessage = data.error ?? "Failed to deal dealer card";
+              toast.error(errorMessage);
               setGameState((prev) => ({
                 ...prev,
-                message: data.error ?? "Failed to deal dealer card",
+                message: errorMessage,
               }));
               setIsStanding(false);
               return;
@@ -174,6 +175,7 @@ export default function BlackjackClient() {
           }
         } catch (error) {
           console.error("Failed to deal dealer cards:", error);
+          toast.error("Network error during dealer turn. Please refresh the page.");
           setIsStanding(false);
         }
       }
@@ -342,7 +344,9 @@ export default function BlackjackClient() {
       const data = (await response.json()) as HitResponse;
 
       if (!data.success || !data.game) {
-        setGameState({ ...gameState, message: data.error ?? "Failed to hit" });
+        const errorMessage = data.error ?? "Failed to hit";
+        toast.error(errorMessage);
+        setGameState({ ...gameState, message: errorMessage });
         setIsHitting(false);
         return;
       }
@@ -359,6 +363,8 @@ export default function BlackjackClient() {
       });
     } catch (error) {
       console.error("Failed to hit:", error);
+      toast.error("Network error. Please check your connection and try again.");
+      setGameState({ ...gameState, message: "Network error" });
     } finally {
       setIsHitting(false);
     }
@@ -380,9 +386,11 @@ export default function BlackjackClient() {
       const data = (await response.json()) as StandResponse;
 
       if (!data.success || !data.game) {
+        const errorMessage = data.error ?? "Failed to stand";
+        toast.error(errorMessage);
         setGameState({
           ...gameState,
-          message: data.error ?? "Failed to stand",
+          message: errorMessage,
         });
         setIsStanding(false);
         return;
@@ -404,6 +412,8 @@ export default function BlackjackClient() {
       }
     } catch (error) {
       console.error("Failed to stand:", error);
+      toast.error("Network error. Please check your connection and try again.");
+      setGameState({ ...gameState, message: "Network error" });
       setIsStanding(false);
     }
   };
@@ -427,9 +437,11 @@ export default function BlackjackClient() {
         const data = (await response.json()) as DealerCardResponse;
 
         if (!data.success || !data.game) {
+          const errorMessage = data.error ?? "Failed to deal dealer card";
+          toast.error(errorMessage);
           setGameState((prev) => ({
             ...prev,
-            message: data.error ?? "Failed to deal dealer card",
+            message: errorMessage,
           }));
           setIsStanding(false);
           return;
@@ -480,6 +492,11 @@ export default function BlackjackClient() {
       }
     } catch (error) {
       console.error("Failed to deal dealer cards:", error);
+      toast.error("Network error while dealing dealer cards. Please refresh the page.");
+      setGameState((prev) => ({
+        ...prev,
+        message: "Network error",
+      }));
       setIsStanding(false);
     }
   };
@@ -509,9 +526,13 @@ export default function BlackjackClient() {
           action: data.recommendation.action,
           reasoning: data.recommendation.reasoning,
         });
+      } else {
+        const errorMessage = data.error ?? "Failed to get AI assistance";
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error("Failed to get AI assist:", error);
+      toast.error("Network error. Could not get AI assistance.");
     } finally {
       setIsLoadingAI(false);
     }
@@ -691,7 +712,7 @@ export default function BlackjackClient() {
                     : ""
                 }`}
                 onClick={handleHit}
-                disabled={isHitting}
+                disabled={isHitting || isStanding}
               >
                 {isHitting ? "Hitting..." : "Hit"}
               </Button>
@@ -709,7 +730,7 @@ export default function BlackjackClient() {
                     : ""
                 }`}
                 onClick={handleStand}
-                disabled={isStanding}
+                disabled={isStanding || isHitting}
               >
                 {isStanding ? "Standing..." : "Stand"}
               </Button>

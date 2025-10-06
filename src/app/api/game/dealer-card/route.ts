@@ -4,10 +4,10 @@ import { db } from "@/server/db";
 import { users, games, transactions } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { drawCard, getHandValue } from "@/lib/server-blackjack";
-import { dbGameToGameState } from "@/lib/game-converters";
+import { dbGameToGameState } from "@/models/game-converters";
 import type { GameState, Card, GameResult, TransactionType } from "@/models/game";
 import type { GameIdRequest } from "@/models/api";
-import { creditWinnings, invalidateBalance } from "@/lib/balance-cache";
+import { invalidateBalance } from "@/lib/balance-cache";
 
 export async function POST(request: Request) {
   try {
@@ -102,8 +102,9 @@ export async function POST(request: Request) {
       }
 
       // Persist final game state and update balance
+      let balanceAfter: number;
       try {
-        await db.transaction(async (tx) => {
+        balanceAfter = await db.transaction(async (tx) => {
           const user = await tx.query.users.findFirst({
             where: eq(users.id, session.user.id),
             columns: {
@@ -117,10 +118,11 @@ export async function POST(request: Request) {
 
           if (!user) throw new Error("User not found");
 
-          // Update user stats
+          // Update user stats and balance
           await tx
             .update(users)
             .set({
+              currentBalance: user.currentBalance + winnings,
               totalWins: result === "win" ? user.totalWins + 1 : user.totalWins,
               totalLosses:
                 result === "lose" ? user.totalLosses + 1 : user.totalLosses,
@@ -162,21 +164,20 @@ export async function POST(request: Request) {
               winnings,
             },
           });
+
+          return user.currentBalance + winnings;
         });
       } catch (error) {
         await invalidateBalance(session.user.id);
         throw error;
       }
 
-      // Credit winnings
-      const balanceResult = await creditWinnings(session.user.id, winnings);
-
       return NextResponse.json({
         success: true,
         game: finalGame,
         needsMoreCards: false,
         gameComplete: true,
-        newBalance: balanceResult.balance,
+        newBalance: balanceAfter,
         dealerValue,
       });
     }
@@ -264,8 +265,9 @@ export async function POST(request: Request) {
     }
 
     // Persist final game state and update balance
+    let balanceAfter: number;
     try {
-      await db.transaction(async (tx) => {
+      balanceAfter = await db.transaction(async (tx) => {
         const user = await tx.query.users.findFirst({
           where: eq(users.id, session.user.id),
           columns: {
@@ -279,10 +281,11 @@ export async function POST(request: Request) {
 
         if (!user) throw new Error("User not found");
 
-        // Update user stats (wagered was already incremented in /api/game/deal)
+        // Update user stats and balance (wagered was already incremented in /api/game/deal)
         await tx
           .update(users)
           .set({
+            currentBalance: user.currentBalance + winnings,
             totalWins: result === "win" ? user.totalWins + 1 : user.totalWins,
             totalLosses:
               result === "lose" ? user.totalLosses + 1 : user.totalLosses,
@@ -324,21 +327,20 @@ export async function POST(request: Request) {
             winnings,
           },
         });
+
+        return user.currentBalance + winnings;
       });
     } catch (error) {
       await invalidateBalance(session.user.id);
       throw error;
     }
 
-    // Credit winnings
-    const balanceResult = await creditWinnings(session.user.id, winnings);
-
     return NextResponse.json({
       success: true,
       game: finalGame,
       needsMoreCards: false,
       gameComplete: true,
-      newBalance: balanceResult.balance,
+      newBalance: balanceAfter,
       dealerValue,
     });
   } catch (error) {

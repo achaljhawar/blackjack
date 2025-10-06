@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { AuthenticatedNavbar } from "./authenticated-navbar";
 import { BuyChipsDialog } from "./buy-chips-dialog";
-import { useBalance } from "@/lib/balance-context";
+import { useBalance } from "@/components/balance-context";
+import { toast } from "sonner";
 import type { NavbarClientWrapperProps } from "@/models/components";
 import type { BalanceResponse } from "@/models/api";
 
@@ -25,12 +26,18 @@ export function NavbarClientWrapper({ session }: NavbarClientWrapperProps) {
         body: JSON.stringify({ amount }),
       });
 
-      if (response.ok) {
-        const data = (await response.json()) as BalanceResponse;
+      const data = (await response.json()) as BalanceResponse;
+
+      if (response.ok && data.success) {
         setBalance(data.balance);
+        toast.success(`Successfully purchased ${amount} chips!`);
+      } else {
+        const errorMessage = data.error ?? "Failed to purchase chips";
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error("Failed to buy chips:", error);
+      toast.error("Network error. Could not purchase chips.");
     }
   };
 

@@ -5,7 +5,7 @@ import { Geist } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
-import { BalanceProvider } from "@/lib/balance-context";
+import { BalanceProvider } from "@/components/balance-context";
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "@/components/ui/sonner";
 
