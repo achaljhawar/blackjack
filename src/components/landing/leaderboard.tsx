@@ -14,38 +14,41 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Trophy, Medal, Award } from "lucide-react";
+import { db } from "@/server/db";
+import { users } from "@/server/db/schema";
+import { desc, sql } from "drizzle-orm";
 
-export function Leaderboard() {
-  const leaderboardData = [
-    {
-      rank: 1,
-      name: "Alexandra Chen",
-      profit: "+$12,450",
-      wins: 342,
-      icon: Trophy,
-    },
-    {
-      rank: 2,
-      name: "Marcus Rodriguez",
-      profit: "+$9,820",
-      wins: 298,
-      icon: Medal,
-    },
-    {
-      rank: 3,
-      name: "Sarah Johnson",
-      profit: "+$8,340",
-      wins: 276,
-      icon: Award,
-    },
-    { rank: 4, name: "David Kim", profit: "+$7,125", wins: 251 },
-    { rank: 5, name: "Emma Williams", profit: "+$6,890", wins: 243 },
-    { rank: 6, name: "James Anderson", profit: "+$5,670", wins: 229 },
-    { rank: 7, name: "Olivia Martinez", profit: "+$4,920", wins: 215 },
-    { rank: 8, name: "Michael Brown", profit: "+$4,350", wins: 198 },
-    { rank: 9, name: "Sophia Taylor", profit: "+$3,780", wins: 187 },
-    { rank: 10, name: "Daniel Wilson", profit: "+$3,240", wins: 172 },
-  ];
+export async function Leaderboard() {
+  // Fetch top 10 players from database
+  const topPlayers = await db
+    .select({
+      name: users.name,
+      email: users.email,
+      totalWins: users.totalWins,
+      totalLosses: users.totalLosses,
+      totalPushes: users.totalPushes,
+    })
+    .from(users)
+    .orderBy(desc(sql`${users.currentBalance} - 500 - ${users.totalChipsBought}`))
+    .limit(10);
+
+  const leaderboardData = topPlayers.map((player, index) => {
+    const getIcon = (rank: number) => {
+      if (rank === 1) return Trophy;
+      if (rank === 2) return Medal;
+      if (rank === 3) return Award;
+      return undefined;
+    };
+
+    return {
+      rank: index + 1,
+      name: player.name ?? player.email,
+      wins: player.totalWins,
+      losses: player.totalLosses,
+      pushes: player.totalPushes,
+      icon: getIcon(index + 1),
+    };
+  });
 
   return (
     <section id="leaderboard" className="py-24 md:py-32">
@@ -64,7 +67,7 @@ export function Leaderboard() {
           <CardHeader>
             <CardTitle className="text-2xl">Global Rankings</CardTitle>
             <CardDescription>
-              Top 10 players by total profit this month
+              Top 10 players by total wins
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -78,7 +81,10 @@ export function Leaderboard() {
                       Wins
                     </TableHead>
                     <TableHead className="text-right font-semibold">
-                      Profit
+                      Losses
+                    </TableHead>
+                    <TableHead className="text-right font-semibold">
+                      Pushes
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -102,8 +108,11 @@ export function Leaderboard() {
                         <TableCell className="text-muted-foreground text-right">
                           {player.wins}
                         </TableCell>
-                        <TableCell className="text-primary text-right font-mono font-semibold">
-                          {player.profit}
+                        <TableCell className="text-muted-foreground text-right">
+                          {player.losses}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-right">
+                          {player.pushes}
                         </TableCell>
                       </TableRow>
                     );

@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Coins, Moon, Sun, Menu, LogOut, Home, History } from "lucide-react";
+import { Coins, Moon, Sun, Menu, LogOut, Home, History, Trophy } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { AuthenticatedNavbarProps } from "@/models/components";
 
@@ -97,6 +97,15 @@ export function AuthenticatedNavbar({
           >
             <History className="mr-2 h-4 w-4" />
             History
+          </Button>
+        </Link>
+        <Link href="/leaderboard">
+          <Button
+            variant="ghost"
+            className="text-foreground/80 hover:bg-accent hover:text-foreground"
+          >
+            <Trophy className="mr-2 h-4 w-4" />
+            Leaderboard
           </Button>
         </Link>
         <Button
@@ -232,6 +241,14 @@ export function AuthenticatedNavbar({
               >
                 <History className="h-5 w-5" />
                 History
+              </Link>
+              <Link
+                href="/leaderboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-foreground hover:bg-accent flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors"
+              >
+                <Trophy className="h-5 w-5" />
+                Leaderboard
               </Link>
               <button
                 onClick={() => {

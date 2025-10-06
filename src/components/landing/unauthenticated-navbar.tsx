@@ -11,9 +11,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { LoginDialog } from "./login-dialog";
 
 export function UnauthenticatedNavbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
   const navLinks = [
@@ -48,7 +50,7 @@ export function UnauthenticatedNavbar() {
           ))}
         </nav>
 
-        {/* Desktop Theme Toggle */}
+        {/* Desktop Theme Toggle & Sign In */}
         <div className="hidden items-center gap-2 md:flex">
           <Button
             variant="ghost"
@@ -60,6 +62,9 @@ export function UnauthenticatedNavbar() {
             <Sun className="h-5 w-5 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
             <Moon className="absolute h-5 w-5 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
             <span className="sr-only">Toggle theme</span>
+          </Button>
+          <Button onClick={() => setLoginDialogOpen(true)}>
+            Sign In
           </Button>
         </div>
 
@@ -108,11 +113,21 @@ export function UnauthenticatedNavbar() {
                     {link.label}
                   </a>
                 ))}
+                <Button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLoginDialogOpen(true);
+                  }}
+                  className="mt-4"
+                >
+                  Sign In
+                </Button>
               </nav>
             </SheetContent>
           </Sheet>
         </div>
       </div>
+      <LoginDialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen} />
     </header>
   );
 }
