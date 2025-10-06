@@ -10,3 +10,8 @@ demo:
 
 https://github.com/user-attachments/assets/07cb65e6-9bbb-44c1-ab87-0c79c74b252e
 
+
+
+Assumptions: 
+- dealer hits on soft 17 (Ace+6)
+- rest all rules are followed as per the guidelines
