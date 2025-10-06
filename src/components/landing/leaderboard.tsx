@@ -29,7 +29,7 @@ export async function Leaderboard() {
       totalPushes: users.totalPushes,
     })
     .from(users)
-    .orderBy(desc(sql`${users.currentBalance} - 500 - ${users.totalChipsBought}`))
+    .orderBy(desc(users.totalWins))
     .limit(10);
 
   const leaderboardData = topPlayers.map((player, index) => {

@@ -14,7 +14,7 @@ export default async function LeaderboardPage() {
     redirect("/");
   }
 
-  // Fetch top players by total profit (currentBalance - initial 500 chips)
+  // Fetch top players by total wins
   const topPlayers = await db
     .select({
       id: users.id,
@@ -28,7 +28,7 @@ export default async function LeaderboardPage() {
       profit: sql<number>`${users.currentBalance} - 500 - ${users.totalChipsBought}`,
     })
     .from(users)
-    .orderBy(desc(sql`${users.currentBalance} - 500 - ${users.totalChipsBought}`))
+    .orderBy(desc(users.totalWins))
     .limit(100); // Fetch top 100 players
 
   const leaderboardData = topPlayers.map((player, index) => ({
