@@ -143,23 +143,24 @@ export function stand(gameState: GameState): GameState {
   };
 }
 
-// Dealer plays automatically (hits on 16 or less, stands on 17+)
+// Dealer plays automatically (hits on 16 or less and soft 17, stands on hard 17+)
 export function playDealerTurn(gameState: GameState): GameState {
   if (gameState.status !== "dealer_turn") {
     throw new Error("Not dealer's turn");
   }
 
   let dealerHand = gameState.dealerHand;
-  let dealerValue = getHandValue(dealerHand);
+  let dealerHandValue = calculateHandValue(dealerHand);
 
-  // Dealer hits on 16 or less
-  while (dealerValue < 17) {
+  // Dealer hits on 16 or less, and hits on soft 17
+  while (dealerHandValue.value < 17 || (dealerHandValue.value === 17 && dealerHandValue.isSoft)) {
     const newCard = drawCard();
     dealerHand = [...dealerHand, newCard];
-    dealerValue = getHandValue(dealerHand);
+    dealerHandValue = calculateHandValue(dealerHand);
   }
 
   const playerValue = getHandValue(gameState.playerHand);
+  const dealerValue = dealerHandValue.value;
 
   // Determine winner
   let result: GameResult;

@@ -3,7 +3,7 @@ import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { users, games, transactions } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { drawCard, getHandValue } from "@/lib/server-blackjack";
+import { drawCard, getHandValue, calculateHandValue } from "@/lib/server-blackjack";
 import { dbGameToGameState } from "@/models/game-converters";
 import type { GameState, Card, GameResult, TransactionType } from "@/models/game";
 import type { GameIdRequest } from "@/models/api";
@@ -49,12 +49,14 @@ export async function POST(request: Request) {
     }
 
     let dealerHand = dbGame.dealerHand as Card[];
-    let dealerValue = getHandValue(dealerHand);
+    let dealerHandValue = calculateHandValue(dealerHand);
 
     // Check if dealer needs a card BEFORE drawing
-    if (dealerValue >= 17) {
+    // Dealer stands on hard 17+ but hits on soft 17
+    if (dealerHandValue.value >= 17 && !(dealerHandValue.value === 17 && dealerHandValue.isSoft)) {
       // Dealer is already done, settle the game immediately without drawing
       const playerValue = getHandValue(dbGame.playerHand as Card[]);
+      const dealerValue = dealerHandValue.value;
 
       let result: GameResult;
       if (dealerValue > 21) {
@@ -185,10 +187,11 @@ export async function POST(request: Request) {
     // Draw one card for the dealer
     const newCard = drawCard();
     dealerHand = [...dealerHand, newCard];
-    dealerValue = getHandValue(dealerHand);
+    dealerHandValue = calculateHandValue(dealerHand);
+    const dealerValue = dealerHandValue.value;
 
-    // Check if dealer still needs more cards
-    const stillNeedsCard = dealerValue < 17;
+    // Check if dealer still needs more cards (hits on soft 17, stands on hard 17+)
+    const stillNeedsCard = dealerHandValue.value < 17 || (dealerHandValue.value === 17 && dealerHandValue.isSoft);
 
     if (stillNeedsCard) {
       // Update database with intermediate state using converter
