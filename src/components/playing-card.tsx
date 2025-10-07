@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Card } from "@/models/game";
 import type { PlayingCardProps } from "@/models/components";
 
@@ -46,10 +47,13 @@ export function PlayingCard({ card, faceDown, isNew }: PlayingCardProps) {
     // Face-down card
     return (
       <div className={`relative ${animationClass}`}>
-        <img
+        <Image
           src="/cards-webp/backdesign.webp"
           alt="Card back"
+          width={96}
+          height={128}
           className="h-20 w-14 rounded-lg border-2 border-black sm:h-32 sm:w-24"
+          priority
         />
       </div>
     );
@@ -59,10 +63,13 @@ export function PlayingCard({ card, faceDown, isNew }: PlayingCardProps) {
 
   return (
     <div className={`relative ${animationClass}`}>
-      <img
+      <Image
         src={`/cards-webp/${cardFileName}`}
         alt={`${card.rank} of ${card.suit}`}
+        width={96}
+        height={128}
         className="h-20 w-14 rounded-lg border-2 border-black sm:h-32 sm:w-24"
+        priority
       />
     </div>
   );
