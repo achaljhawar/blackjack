@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { PlayingCard } from "@/components/playing-card";
+import { PlayingCardSimple as PlayingCard } from "@/components/playing-card-simple";
 import { getHandValue } from "@/lib/hand-value";
 import type { Card, ClientGameState } from "@/models/game";
 import type {
