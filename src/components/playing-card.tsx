@@ -1,4 +1,3 @@
-import type { Card } from "@/models/game";
 import type { PlayingCardProps } from "@/models/components";
 
 // import Image from "next/image";
