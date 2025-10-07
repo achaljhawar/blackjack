@@ -31,26 +31,27 @@ export async function POST(request: Request) {
     let result;
     try {
       result = await db.transaction(async (tx) => {
-        // Check for existing active game INSIDE transaction to prevent race conditions
-        const activeGame = await tx.query.games.findFirst({
-          where: and(
-            eq(games.userId, session.user.id),
-            or(
-              eq(games.status, "playing"),
-              eq(games.status, "dealer_turn")
-            )
-          ),
-        });
+        // Optimized: Single query to check active game AND get user balance
+        const [activeGameCheck, user] = await Promise.all([
+          tx.query.games.findFirst({
+            where: and(
+              eq(games.userId, session.user.id),
+              or(
+                eq(games.status, "playing"),
+                eq(games.status, "dealer_turn")
+              )
+            ),
+            columns: { id: true }, // Only select ID for existence check
+          }),
+          tx.query.users.findFirst({
+            where: eq(users.id, session.user.id),
+            columns: { currentBalance: true, totalWagered: true },
+          }),
+        ]);
 
-        if (activeGame) {
+        if (activeGameCheck) {
           throw new Error("You already have an active game. Please complete it first.");
         }
-
-        // Get user's current balance before deduction
-        const user = await tx.query.users.findFirst({
-          where: eq(users.id, session.user.id),
-          columns: { currentBalance: true, totalWagered: true },
-        });
 
         if (!user) throw new Error("User not found");
 
@@ -64,47 +65,45 @@ export async function POST(request: Request) {
         const balanceBefore = user.currentBalance;
         const balanceAfter = balanceBefore - betAmount;
 
-        // Update user balance and totalWagered
-        await tx
-          .update(users)
-          .set({
-            currentBalance: balanceAfter,
-            totalWagered: user.totalWagered + betAmount,
-          })
-          .where(eq(users.id, session.user.id));
-
-        // Persist fully initialized game state to DB
-        await tx.insert(games).values({
-          id: gameState.id,
-          userId: gameState.userId,
-          betAmount: gameState.betAmount,
-          playerHand: gameState.playerHand,
-          dealerHand: gameState.dealerHand,
-          deck: [], // Empty deck for infinite deck mode
-          status: gameState.status,
-          result: gameState.result,
-          playerScore: gameState.playerScore,
-          dealerScore: gameState.dealerScore,
-          createdAt: gameState.createdAt,
-          completedAt: gameState.completedAt,
-          lastActivityAt: new Date(),
-          lastAction: "bet_placed",
-        });
-
-        // Record bet transaction
-        await tx.insert(transactions).values({
-          id: crypto.randomUUID(),
-          userId: session.user.id,
-          type: "bet",
-          amount: -betAmount,
-          balanceBefore,
-          balanceAfter,
-          gameId: gameState.id,
-          metadata: {
-            betAmount,
-            action: "bet_placed",
-          },
-        });
+        // Optimized: Batch inserts and update in parallel
+        await Promise.all([
+          tx
+            .update(users)
+            .set({
+              currentBalance: balanceAfter,
+              totalWagered: user.totalWagered + betAmount,
+            })
+            .where(eq(users.id, session.user.id)),
+          tx.insert(games).values({
+            id: gameState.id,
+            userId: gameState.userId,
+            betAmount: gameState.betAmount,
+            playerHand: gameState.playerHand,
+            dealerHand: gameState.dealerHand,
+            deck: [], // Empty deck for infinite deck mode
+            status: gameState.status,
+            result: gameState.result,
+            playerScore: gameState.playerScore,
+            dealerScore: gameState.dealerScore,
+            createdAt: gameState.createdAt,
+            completedAt: gameState.completedAt,
+            lastActivityAt: new Date(),
+            lastAction: "bet_placed",
+          }),
+          tx.insert(transactions).values({
+            id: crypto.randomUUID(),
+            userId: session.user.id,
+            type: "bet",
+            amount: -betAmount,
+            balanceBefore,
+            balanceAfter,
+            gameId: gameState.id,
+            metadata: {
+              betAmount,
+              action: "bet_placed",
+            },
+          }),
+        ]);
 
         return { balanceAfter };
       });

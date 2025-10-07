@@ -28,9 +28,25 @@ export async function POST(request: Request) {
     let updatedGame;
     try {
       updatedGame = await db.transaction(async (tx) => {
-        // Fetch game state from database INSIDE transaction
+        // Optimized: Only fetch necessary columns for validation
         const dbGame = await tx.query.games.findFirst({
           where: eq(games.id, gameId),
+          columns: {
+            id: true,
+            userId: true,
+            status: true,
+            playerHand: true,
+            dealerHand: true,
+            betAmount: true,
+            deck: true,
+            result: true,
+            playerScore: true,
+            dealerScore: true,
+            createdAt: true,
+            completedAt: true,
+            lastActivityAt: true,
+            lastAction: true,
+          },
         });
 
         if (!dbGame) {

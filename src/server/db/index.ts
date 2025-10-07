@@ -12,7 +12,15 @@ const globalForDb = globalThis as unknown as {
   conn: postgres.Sql | undefined;
 };
 
-const conn = globalForDb.conn ?? postgres(env.SUPABASE_DATABASE_URL);
+// Configure postgres-js for serverless with connection pooling
+// Use Supabase's connection pooler (pgbouncer) for production
+const conn = globalForDb.conn ?? postgres(env.SUPABASE_DATABASE_URL, {
+  prepare: false, // Disable prepared statements for pgbouncer compatibility
+  max: 1, // Maximum 1 connection per serverless function instance
+  idle_timeout: 20, // Close idle connections after 20s
+  max_lifetime: 60 * 30, // Close connections after 30 minutes
+});
+
 if (env.NODE_ENV !== "production") globalForDb.conn = conn;
 
 export const db = drizzle(conn, { schema });
