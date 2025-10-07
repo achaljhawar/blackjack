@@ -333,6 +333,7 @@ export default function BlackjackClient() {
     if (!gameState.id || isHitting) return;
 
     setIsHitting(true);
+    setAiAssist(null);
 
     try {
       const response = await fetch("/api/game/hit", {
@@ -374,6 +375,7 @@ export default function BlackjackClient() {
     if (!gameState.id || isStanding) return;
 
     setIsStanding(true);
+    setAiAssist(null);
 
     try {
       // Step 1: Stand (reveals dealer's face-down card)
