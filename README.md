@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/552ab6b5-91c0-4497-9d87-a610cbb4a8ef
 Assumptions: 
 - dealer hits on soft 17 (Ace+6)
 - a game can have only 3 end results (win, lose or push/tie)
-- player doesn't lose his bet when he reloads , he can rejoin whenever he wants
+- The player doesn’t lose their bet when they reload and can rejoin whenever they want.
 - rest all rules are followed as per the guidelines
 
 ## Setup 
