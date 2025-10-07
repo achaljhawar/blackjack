@@ -1,7 +1,8 @@
+import Image from "next/image";
 import type { Card } from "@/models/game";
 import type { PlayingCardProps } from "@/models/components";
 
-// Helper function to map card data to SVG filename
+// Helper function to map card data to WebP filename
 function getCardFileName(card: Card): string {
   const suitMap: Record<string, string> = {
     "♠": "SPADE",
@@ -29,7 +30,7 @@ function getCardFileName(card: Card): string {
   const suit = suitMap[card.suit];
   const rank = rankMap[card.rank];
 
-  return `${suit}-${rank}.svg`;
+  return `${suit}-${rank}.webp`;
 }
 
 export function PlayingCard({ card, faceDown, isNew }: PlayingCardProps) {
@@ -46,10 +47,13 @@ export function PlayingCard({ card, faceDown, isNew }: PlayingCardProps) {
     // Face-down card
     return (
       <div className={`relative ${animationClass}`}>
-        <img
-          src="/backdesign.svg"
+        <Image
+          src="/cards-webp/backdesign.webp"
           alt="Card back"
+          width={96}
+          height={128}
           className="h-20 w-14 rounded-lg border-2 border-black sm:h-32 sm:w-24"
+          priority
         />
       </div>
     );
@@ -59,10 +63,13 @@ export function PlayingCard({ card, faceDown, isNew }: PlayingCardProps) {
 
   return (
     <div className={`relative ${animationClass}`}>
-      <img
-        src={`/Single Cards (One Per FIle)/${cardFileName}`}
+      <Image
+        src={`/cards-webp/${cardFileName}`}
         alt={`${card.rank} of ${card.suit}`}
+        width={96}
+        height={128}
         className="h-20 w-14 rounded-lg border-2 border-black sm:h-32 sm:w-24"
+        priority
       />
     </div>
   );
